@@ -28,8 +28,10 @@ const flagMap = Object.fromEntries(
     return [k, v ?? true];
   })
 );
-if (!projectName) {
+if (!projectName && !flagMap.url) {
   console.error(`Usage: node pipeline.mjs <project> [options]
+         node pipeline.mjs --url=https://site.com [options]   # auto-generate scenes
+  --url=<live URL>               auto-discover nav + content, build the demo (no config file)
   --mode=simple|zoom|short       simple=plain · zoom=cinematic · short=vertical social cut
   --format=landscape|portrait|square|4:5
   --strategy=blur|crop           vertical fit: blur=keep all · crop=follow click
@@ -43,9 +45,23 @@ if (!projectName) {
   process.exit(1);
 }
 
-const cfgPath = path.join(__dirname, 'projects', `${projectName}.mjs`);
-const cfg = (await import(cfgPath)).default;
-if (!cfg) throw new Error(`No default export in ${cfgPath}`);
+// Load config: from a project file, or auto-generated from a live URL.
+let cfg;
+let slug;
+if (flagMap.url) {
+  const { buildAutoConfig } = await import('./lib/autoscenes.mjs');
+  console.log(`Auto-discovering scenes for ${flagMap.url}…`);
+  cfg = await buildAutoConfig(flagMap.url, {
+    mode: flagMap.mode, tts: flagMap.tts, voice: flagMap.voice, subtitles: flagMap.subs,
+  });
+  slug = projectName || new URL(flagMap.url).hostname.replace(/^www\./, '').replace(/[^a-z0-9]+/gi, '-');
+  console.log(`  found ${cfg.scenes.length} scenes: ${cfg.scenes.map((s) => s.title).join(', ')}`);
+} else {
+  const cfgPath = path.join(__dirname, 'projects', `${projectName}.mjs`);
+  cfg = (await import(cfgPath)).default;
+  if (!cfg) throw new Error(`No default export in ${cfgPath}`);
+  slug = projectName;
+}
 
 // ─── Resolve which scenes to render (preset / explicit / order / exclude) ────
 const { selected, summary } = resolveScenes(cfg.scenes, flagMap, cfg);
@@ -85,7 +101,7 @@ assertWithinBudget(tts.backend, tts.model || '*', totalChars, cap);
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
 const viewport = cfg.viewport || { width: 1920, height: 1080 };
-const tmpDir = path.join(__dirname, 'tmp', `${projectName}-${suffix}`);
+const tmpDir = path.join(__dirname, 'tmp', `${slug}-${suffix}`);
 if (existsSync(tmpDir)) rmSync(tmpDir, { recursive: true, force: true });
 mkdirSync(tmpDir, { recursive: true });
 const audioDir = path.join(tmpDir, 'audio');
@@ -128,7 +144,7 @@ await buildNarrationTrack(enriched, audioPath, path.join(tmpDir, 'audio-work'));
 // ─── 4. Assemble final video ─────────────────────────────────────────────────
 const outDir = path.join(__dirname, 'output');
 mkdirSync(outDir, { recursive: true });
-const outMp4 = path.join(outDir, `${projectName}-demo-${suffix}.mp4`);
+const outMp4 = path.join(outDir, `${slug}-demo-${suffix}.mp4`);
 
 if (mode === 'simple') {
   console.log(`[4/4] Muxing MP4 (simple mode, CRF ${cfg.video?.crf ?? 17})…`);
@@ -153,7 +169,7 @@ if (mode === 'simple') {
     bodyStart: rec.bodyStart,
     narrationWav: audioPath,
     outMp4,
-    srtPath: path.join(tmpDir, `${projectName}.srt`),
+    srtPath: path.join(tmpDir, `${slug}.srt`),
     opts: {
       srcW: viewport.width,
       srcH: viewport.height,
