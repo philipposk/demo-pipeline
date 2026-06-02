@@ -42,9 +42,32 @@ export default {
   url,
   viewport: { width: 1920, height: 1080 },
   deviceScaleFactor: 2,
-  // Default TTS — override via CLI: --tts=openai|elevenlabs|kokoro
-  tts: { backend: 'openai', model: 'tts-1-hd', voice: 'nova', rate: 175 },
-  video: { crf: 17, preset: 'slow' },
+
+  // Render mode: 'simple' (plain) | 'zoom' (cinematic: push-in, cursor, cards, logo)
+  mode: 'zoom',
+  subtitles: 'sidecar',           // 'off' | 'sidecar' | 'burn'
+  logo: 'assets/logo-6x7.png',    // watermark + card logo (path relative to repo root)
+  logoOpacity: 0.85,
+
+  // Default TTS — override via CLI: --tts=edge|openai|elevenlabs|kokoro
+  // edge = Microsoft neural voices, free, no key. Ava = clear female narrator.
+  tts: { backend: 'edge', voice: 'en-US-AvaMultilingualNeural', rate: 175 },
+
+  video: { crf: 17, preset: 'slow', fps: 30, zoom: 0.16 },
+
+  intro: {
+    dur: 2.8,
+    bg: '0x0A0F0A',
+    title: 'Greenpert',
+    subtitle: 'Design the perfect strain before you plant a seed',
+  },
+  outro: {
+    dur: 3.2,
+    bg: '0x0A0F0A',
+    title: 'Greenpert',
+    subtitle: 'Built with 6x7  -  demo.6x7.gr',
+  },
+
   scenes: [
     {
       narration:

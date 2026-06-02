@@ -1,8 +1,19 @@
 # demo-pipeline
 
-Generates a click-through demo video for a web app. Playwright records the browser, TTS narrates each scene, ffmpeg stitches them into a 1080p MP4.
+Generates a click-through demo video for a web app. Playwright records the browser, TTS narrates each scene, ffmpeg stitches them into a 1080p MP4 — with optional cinematic zoom, animated cursor, intro/outro cards, logo watermark, and subtitles.
 
-**Stack:** Playwright · OpenAI TTS / Kokoro (local) / ElevenLabs / macOS `say` · ffmpeg
+**Stack:** Playwright · edge-tts / OpenAI / Kokoro / ElevenLabs / macOS `say` · ffmpeg
+
+## Modes
+
+| Mode | What you get |
+|---|---|
+| `simple` | Plain continuous screen recording + narration. Fast. |
+| `zoom` | Cinematic: per-scene push-in zoom toward each click, animated fake cursor + click ripple, intro & outro title cards, logo watermark bottom-right, subtitles. |
+
+```bash
+node pipeline.mjs greenpert --mode=zoom --tts=edge --subs=burn
+```
 
 ## One-time setup
 
@@ -27,24 +38,31 @@ MAX_COST_PER_VIDEO=0.20   # hard abort if estimate exceeds this
 cd ~/path/to/your-app && npm run dev
 
 # 2. Render
-node pipeline.mjs greenpert
+node pipeline.mjs greenpert --mode=zoom
 
 # Override TTS backend
-node pipeline.mjs greenpert --tts=kokoro          # free, local
-node pipeline.mjs greenpert --tts=openai          # ~$0.04/video
+node pipeline.mjs greenpert --tts=edge            # free, realistic (recommended)
+node pipeline.mjs greenpert --tts=kokoro          # free, local, offline
+node pipeline.mjs greenpert --tts=openai --model=gpt-4o-mini-tts  # ~$0.02/video
 node pipeline.mjs greenpert --tts=say             # macOS fallback
+
+# Subtitles: off | sidecar (.srt next to mp4) | burn (into the picture)
+node pipeline.mjs greenpert --mode=zoom --subs=burn
 ```
 
-Output: `output/<project>-demo-<backend>.mp4`
+Output: `output/<project>-demo-<mode>-<backend>.mp4` (+ `.srt` when `--subs=sidecar`)
 
 ## TTS backends
 
 | Backend | Quality | Cost (~90s video) | Notes |
 |---|---|---|---|
-| `openai` | Very good | ~$0.04 (tts-1-hd) | Default. Voices: `alloy` `echo` `fable` `onyx` `nova` `shimmer` |
-| `kokoro` | Good | Free | Local 82M model, downloads once (~330 MB). Voices: `af_bella` `am_michael` `bm_george` `bf_emma` |
+| `edge` | Very good | **Free** | Microsoft neural voices, no key. Voices: `en-US-AvaMultilingualNeural` `en-US-AndrewMultilingualNeural` `en-US-EmmaMultilingualNeural` `en-US-BrianMultilingualNeural`. Unofficial endpoint (auto-retries). |
+| `openai` | Very good | ~$0.02 (`gpt-4o-mini-tts`) / ~$0.04 (`tts-1-hd`) | Voices: `alloy` `echo` `fable` `onyx` `nova` `shimmer` `sage` `coral` |
+| `kokoro` | Good | Free | Local 82M model, downloads once (~330 MB), fully offline. Voices: `af_bella` `am_michael` `bm_george` `bf_emma` |
 | `elevenlabs` | Excellent | ~$0.12 (turbo) | Needs Starter plan + API key with `text_to_speech` scope |
 | `say` | Robotic | Free | macOS only. Voices: `Samantha` `Daniel` `Karen` |
+
+**Voice clone (your own voice):** Chatterbox (free, local, MIT) or ElevenLabs. Not yet wired — see `AGENTS.md` roadmap.
 
 ## Add a new project
 
@@ -78,10 +96,11 @@ Run `node inspect.mjs` first (edit the `routes` array inside) to screenshot ever
 ## Lib interface (for agents/contributors)
 
 ```
-lib/narrate.mjs   narrate(text, opts, outWavPath) → { durationSec, charsUsed }
-lib/record.mjs    record(cfg) → webmPath
-lib/merge.mjs     buildNarrationTrack(scenes, outWav, workDir)
-                  muxToMp4({ videoPath, audioPath, outMp4, crf, preset })
+lib/narrate.mjs   narrate(text, opts, outWavPath) → { durationSec, charsUsed }   (edge|openai|elevenlabs|kokoro|say)
+lib/record.mjs    record(cfg) → { webmPath, boundaries, clicks, bodyStart }       (injects cursor + logs clicks)
+lib/effects.mjs   buildCinematic({ webmPath, scenes, boundaries, clicks, ... })   (mode 2: zoom, cards, logo, subs)
+lib/subtitle.mjs  buildSrt(scenes, offsetSec, prerollSec) → SRT string
+lib/merge.mjs     buildNarrationTrack(...) · muxToMp4({...})                       (mode 1)
 lib/cost.mjs      assertWithinBudget(backend, model, chars, capUSD)
 ```
 

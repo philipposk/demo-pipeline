@@ -10,6 +10,7 @@ import 'dotenv/config';
 import { narrate } from './lib/narrate.mjs';
 import { record } from './lib/record.mjs';
 import { buildNarrationTrack, muxToMp4 } from './lib/merge.mjs';
+import { buildCinematic } from './lib/effects.mjs';
 import { assertWithinBudget } from './lib/cost.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,7 +28,7 @@ const flagMap = Object.fromEntries(
   })
 );
 if (!projectName) {
-  console.error('Usage: node pipeline.mjs <project> [--tts=openai|elevenlabs|kokoro|say] [--voice=…] [--model=…] [--suffix=…]');
+  console.error('Usage: node pipeline.mjs <project> [--mode=simple|zoom] [--tts=edge|openai|elevenlabs|kokoro|say] [--voice=…] [--model=…] [--subs=off|sidecar|burn] [--suffix=…]');
   process.exit(1);
 }
 
@@ -47,12 +48,15 @@ const tts = {
   rate: cfg.tts?.rate || 175,
   speed: cfg.tts?.speed || 1.0,
 };
-const suffix = flagMap.suffix || tts.backend;
+// ─── Mode + subtitles ────────────────────────────────────────────────────────
+const mode = flagMap.mode || cfg.mode || 'simple';     // 'simple' | 'zoom'
+const subs = flagMap.subs || cfg.subtitles || 'sidecar'; // 'off' | 'sidecar' | 'burn'
+const suffix = flagMap.suffix || `${mode}-${tts.backend}`;
 
 // ─── Budget guard ────────────────────────────────────────────────────────────
 const totalChars = cfg.scenes.reduce((s, x) => s + x.narration.length, 0);
 const cap = parseFloat(process.env.MAX_COST_PER_VIDEO || '0.20');
-console.log(`Project: ${cfg.name}  ·  TTS: ${tts.backend}${tts.model ? `:${tts.model}` : ''}  ·  voice: ${tts.voice ?? '(default)'}`);
+console.log(`Project: ${cfg.name}  ·  mode: ${mode}  ·  TTS: ${tts.backend}${tts.model ? `:${tts.model}` : ''}  ·  voice: ${tts.voice ?? '(default)'}  ·  subs: ${subs}`);
 assertWithinBudget(tts.backend, tts.model || '*', totalChars, cap);
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
@@ -81,32 +85,59 @@ console.log(`  total: ${totalAudio.toFixed(1)}s  ·  ${usedChars} chars`);
 
 // ─── 2. Record browser ───────────────────────────────────────────────────────
 console.log(`[2/4] Recording browser flow at ${cfg.url} (viewport ${viewport.width}x${viewport.height})…`);
-const webmPath = await record({
+const rec = await record({
   url: cfg.url,
   viewport,
   scenes: enriched,
   videoDir,
   padSec: 0.6,
   deviceScaleFactor: cfg.deviceScaleFactor ?? 2,
+  cursor: mode !== 'simple',
 });
-console.log(`  video: ${webmPath}`);
+console.log(`  video: ${rec.webmPath}  ·  clicks logged: ${rec.clicks.length}`);
 
 // ─── 3. Concat narration track ───────────────────────────────────────────────
 console.log(`[3/4] Building narration track…`);
 const audioPath = path.join(tmpDir, 'narration.wav');
 await buildNarrationTrack(enriched, audioPath, path.join(tmpDir, 'audio-work'));
 
-// ─── 4. Mux ──────────────────────────────────────────────────────────────────
-console.log(`[4/4] Muxing MP4 (CRF ${cfg.video?.crf ?? 17}, preset ${cfg.video?.preset ?? 'slow'})…`);
+// ─── 4. Assemble final video ─────────────────────────────────────────────────
 const outDir = path.join(__dirname, 'output');
 mkdirSync(outDir, { recursive: true });
 const outMp4 = path.join(outDir, `${projectName}-demo-${suffix}.mp4`);
-await muxToMp4({
-  videoPath: webmPath,
-  audioPath,
-  outMp4,
-  crf: cfg.video?.crf ?? 17,
-  preset: cfg.video?.preset ?? 'slow',
-});
+
+if (mode === 'simple') {
+  console.log(`[4/4] Muxing MP4 (simple mode, CRF ${cfg.video?.crf ?? 17})…`);
+  await muxToMp4({
+    videoPath: rec.webmPath,
+    audioPath,
+    outMp4,
+    crf: cfg.video?.crf ?? 17,
+    preset: cfg.video?.preset ?? 'slow',
+  });
+} else {
+  console.log(`[4/4] Cinematic assembly (zoom + cards + logo + subs=${subs})…`);
+  await buildCinematic({
+    webmPath: rec.webmPath,
+    scenes: enriched,
+    boundaries: rec.boundaries,
+    clicks: rec.clicks,
+    bodyStart: rec.bodyStart,
+    narrationWav: audioPath,
+    outMp4,
+    srtPath: path.join(tmpDir, `${projectName}.srt`),
+    opts: {
+      W: viewport.width,
+      H: viewport.height,
+      fps: cfg.video?.fps ?? 30,
+      zoom: cfg.video?.zoom ?? 0.12,
+      logo: cfg.logo ? path.join(__dirname, cfg.logo) : null,
+      logoOpacity: cfg.logoOpacity ?? 0.9,
+      subtitles: subs,
+      intro: cfg.intro,
+      outro: cfg.outro,
+    },
+  });
+}
 
 console.log(`\nDone. → ${outMp4}`);
