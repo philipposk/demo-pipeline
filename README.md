@@ -1,48 +1,92 @@
 # demo-pipeline
 
-Generates a click-through demo video for one of your projects. Free, local, no API keys.
+Generates a click-through demo video for a web app. Playwright records the browser, TTS narrates each scene, ffmpeg stitches them into a 1080p MP4.
 
-**Stack:** Playwright records the browser, macOS `say` does the voiceover, ffmpeg stitches them together.
+**Stack:** Playwright · OpenAI TTS / Kokoro (local) / ElevenLabs / macOS `say` · ffmpeg
 
 ## One-time setup
 
 ```bash
-cd "$(dirname "$0")"   # this folder
 npm install
-npm run install-browsers   # downloads Chromium for Playwright (~150MB)
+npm run install-browsers   # downloads Chromium (~150 MB)
+brew install ffmpeg        # if not already installed
 ```
 
-You also need `ffmpeg` on PATH (`brew install ffmpeg`) and macOS (for `say`).
+Copy `.env.example` to `.env` and fill in your keys (only needed for paid backends):
+
+```
+OPENAI_API_KEY=sk-...
+ELEVENLABS_API_KEY=sk_...
+MAX_COST_PER_VIDEO=0.20   # hard abort if estimate exceeds this
+```
 
 ## Run a demo
 
 ```bash
-# 1. Start the target app yourself first (in another terminal):
-#    cd ~/Devoloper\ Projects/Greenpert && npm run dev
-# 2. Then:
+# 1. Start the target app (separate terminal)
+cd ~/path/to/your-app && npm run dev
+
+# 2. Render
 node pipeline.mjs greenpert
+
+# Override TTS backend
+node pipeline.mjs greenpert --tts=kokoro          # free, local
+node pipeline.mjs greenpert --tts=openai          # ~$0.04/video
+node pipeline.mjs greenpert --tts=say             # macOS fallback
 ```
 
-Outputs `output/<project>-demo.mp4`.
+Output: `output/<project>-demo-<backend>.mp4`
+
+## TTS backends
+
+| Backend | Quality | Cost (~90s video) | Notes |
+|---|---|---|---|
+| `openai` | Very good | ~$0.04 (tts-1-hd) | Default. Voices: `alloy` `echo` `fable` `onyx` `nova` `shimmer` |
+| `kokoro` | Good | Free | Local 82M model, downloads once (~330 MB). Voices: `af_bella` `am_michael` `bm_george` `bf_emma` |
+| `elevenlabs` | Excellent | ~$0.12 (turbo) | Needs Starter plan + API key with `text_to_speech` scope |
+| `say` | Robotic | Free | macOS only. Voices: `Samantha` `Daniel` `Karen` |
 
 ## Add a new project
 
-Drop a config file at `projects/<name>.mjs`. See `projects/greenpert.mjs` as a template. Each config exports:
+Create `projects/<name>.mjs`. Use `projects/greenpert.mjs` as a template.
 
-- `name` — display name
-- `url` — base URL (e.g. `http://localhost:3000`)
-- `viewport` — `{width, height}` (default 1280x800)
-- `voice` — macOS voice name (default `Samantha`)
-- `scenes` — array of `{narration, action}`. `action` is `async (page) => { ... }`. Each scene's on-screen time is padded to the narration's audio length, so clicks and words stay in sync.
+Key fields:
 
-## Voice options
-
-```bash
-say -v "?"   # list installed voices
+```js
+export default {
+  name: 'My App',
+  url: 'http://localhost:3000',
+  viewport: { width: 1920, height: 1080 },
+  tts: { backend: 'openai', model: 'tts-1-hd', voice: 'nova' },
+  video: { crf: 17, preset: 'slow' },
+  scenes: [
+    {
+      narration: 'Text spoken during this scene.',
+      action: async (page) => {
+        // Playwright — clicks, navigation, scroll.
+        // Scene waits until both action + audio duration complete.
+        await page.getByRole('link', { name: /Dashboard/i }).click();
+        await page.waitForLoadState('domcontentloaded');
+      },
+    },
+  ],
+};
 ```
 
-Good ones: `Samantha`, `Daniel`, `Karen`, `Tom`, `Alex`.
+Run `node inspect.mjs` first (edit the `routes` array inside) to screenshot every route and dump available buttons/links — helps you write accurate selectors.
 
-## Upgrading to a real TTS later
+## Lib interface (for agents/contributors)
 
-Replace `lib/narrate.mjs` with a function that calls ElevenLabs / OpenAI TTS and saves a WAV. Same interface — `narrate(text, voice, outPath) -> seconds`.
+```
+lib/narrate.mjs   narrate(text, opts, outWavPath) → { durationSec, charsUsed }
+lib/record.mjs    record(cfg) → webmPath
+lib/merge.mjs     buildNarrationTrack(scenes, outWav, workDir)
+                  muxToMp4({ videoPath, audioPath, outMp4, crf, preset })
+lib/cost.mjs      assertWithinBudget(backend, model, chars, capUSD)
+```
+
+See `AGENTS.md` for full agent/LLM usage guide.
+
+## License
+
+MIT
