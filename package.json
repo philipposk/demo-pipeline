@@ -1,0 +1,16 @@
+{
+  "name": "demo-pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Generates click-through demo videos for projects. Playwright records + macOS say narrates + ffmpeg merges.",
+  "scripts": {
+    "demo": "node pipeline.mjs",
+    "install-browsers": "npx playwright install chromium"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "kokoro-js": "^1.2.1",
+    "playwright": "^1.49.0"
+  }
+}
