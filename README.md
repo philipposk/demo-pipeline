@@ -9,10 +9,41 @@ Generates a click-through demo video for a web app. Playwright records the brows
 | Mode | What you get |
 |---|---|
 | `simple` | Plain continuous screen recording + narration. Fast. |
-| `zoom` | Cinematic: per-scene push-in zoom toward each click, animated fake cursor + click ripple, intro & outro title cards, logo watermark bottom-right, subtitles. |
+| `zoom` | Cinematic landscape: per-scene push-in zoom toward each click, animated fake cursor + click ripple, intro & outro title cards, logo watermark, subtitles. |
+| `short` | Vertical social cut (TikTok/Reels/Shorts): portrait 9:16, punchier zoom, snappy cards, big burned captions. Pair with `--preset=highlights` for a fast, engaging clip. |
 
 ```bash
-node pipeline.mjs greenpert --mode=zoom --tts=edge --subs=burn
+node pipeline.mjs greenpert --mode=zoom                      # landscape cinematic
+node pipeline.mjs greenpert --mode=short --preset=highlights  # vertical reel
+```
+
+## Aspect ratios
+
+`--format=landscape|portrait|square|4:5` (recording is always 16:9; the effects layer reframes).
+`--strategy=blur|crop` — how a 16:9 source fits a vertical frame:
+- `blur` (default): whole frame centered, blurred copy fills the margins — nothing lost.
+- `crop`: crop+follow the click point — fills the screen, may cut the sides.
+
+```bash
+node pipeline.mjs greenpert --mode=zoom --format=square
+node pipeline.mjs greenpert --mode=short --strategy=crop
+```
+
+## Pick / reorder which features appear
+
+Every scene can declare `id`, `title`, `tags`, `priority` (0-100). Then:
+
+```bash
+--preset=full|highlights|basic     # full=all · highlights=top/spread · basic=core 3
+--scenes=s0,s3,s10                 # explicit set (overrides preset)
+--order=s10,s0,s3                  # explicit order
+--exclude=s5                       # drop scenes
+--dry-run                          # print the resolved list, render nothing
+```
+
+```bash
+node pipeline.mjs greenpert --preset=basic --dry-run
+node pipeline.mjs greenpert --scenes=s0,s3,s6,s10 --order=s3,s0,s6,s10
 ```
 
 ## One-time setup

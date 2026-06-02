@@ -11,6 +11,7 @@ import { narrate } from './lib/narrate.mjs';
 import { record } from './lib/record.mjs';
 import { buildNarrationTrack, muxToMp4 } from './lib/merge.mjs';
 import { buildCinematic } from './lib/effects.mjs';
+import { resolveScenes } from './lib/select.mjs';
 import { assertWithinBudget } from './lib/cost.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,13 +29,31 @@ const flagMap = Object.fromEntries(
   })
 );
 if (!projectName) {
-  console.error('Usage: node pipeline.mjs <project> [--mode=simple|zoom] [--tts=edge|openai|elevenlabs|kokoro|say] [--voice=…] [--model=…] [--subs=off|sidecar|burn] [--suffix=…]');
+  console.error(`Usage: node pipeline.mjs <project> [options]
+  --mode=simple|zoom|short       simple=plain · zoom=cinematic · short=vertical social cut
+  --format=landscape|portrait|square|4:5
+  --strategy=blur|crop           vertical fit: blur=keep all · crop=follow click
+  --preset=full|highlights|basic which scenes to include
+  --scenes=id1,id2               explicit scene set (overrides preset)
+  --order=id2,id1                explicit order
+  --exclude=id3                  drop scenes
+  --dry-run                      print resolved scene list, do not render
+  --tts=edge|openai|elevenlabs|kokoro|say   --voice=…  --model=…
+  --subs=off|sidecar|burn        --suffix=…`);
   process.exit(1);
 }
 
 const cfgPath = path.join(__dirname, 'projects', `${projectName}.mjs`);
 const cfg = (await import(cfgPath)).default;
 if (!cfg) throw new Error(`No default export in ${cfgPath}`);
+
+// ─── Resolve which scenes to render (preset / explicit / order / exclude) ────
+const { selected, summary } = resolveScenes(cfg.scenes, flagMap, cfg);
+if (!selected.length) { console.error('No scenes selected.'); process.exit(1); }
+if (flagMap['dry-run']) {
+  console.log(`Project: ${cfg.name}  ·  preset: ${flagMap.preset || 'full'}\nResolved ${selected.length}/${cfg.scenes.length} scenes:\n${summary}`);
+  process.exit(0);
+}
 
 // ─── Resolve TTS opts (CLI overrides project defaults) ───────────────────────
 // If CLI changes backend, drop cfg.tts.voice/model — they belong to the cfg's backend, not the new one.
@@ -48,15 +67,20 @@ const tts = {
   rate: cfg.tts?.rate || 175,
   speed: cfg.tts?.speed || 1.0,
 };
-// ─── Mode + subtitles ────────────────────────────────────────────────────────
-const mode = flagMap.mode || cfg.mode || 'simple';     // 'simple' | 'zoom'
-const subs = flagMap.subs || cfg.subtitles || 'sidecar'; // 'off' | 'sidecar' | 'burn'
-const suffix = flagMap.suffix || `${mode}-${tts.backend}`;
+// ─── Mode / format / subtitles ───────────────────────────────────────────────
+const mode = flagMap.mode || cfg.mode || 'simple';     // 'simple' | 'zoom' | 'short'
+const isShort = mode === 'short';
+const cinematic = mode !== 'simple';
+const format = flagMap.format || cfg.format || (isShort ? 'portrait' : 'landscape');
+const strategy = flagMap.strategy || cfg.strategy || 'blur';
+// Shorts force burned captions (social autoplay is muted) unless CLI overrides.
+const subs = flagMap.subs || (isShort ? 'burn' : (cfg.subtitles || 'sidecar'));
+const suffix = flagMap.suffix || `${mode}-${format}-${tts.backend}`;
 
-// ─── Budget guard ────────────────────────────────────────────────────────────
-const totalChars = cfg.scenes.reduce((s, x) => s + x.narration.length, 0);
+// ─── Budget guard (only the SELECTED scenes are narrated) ─────────────────────
+const totalChars = selected.reduce((s, x) => s + x.narration.length, 0);
 const cap = parseFloat(process.env.MAX_COST_PER_VIDEO || '0.20');
-console.log(`Project: ${cfg.name}  ·  mode: ${mode}  ·  TTS: ${tts.backend}${tts.model ? `:${tts.model}` : ''}  ·  voice: ${tts.voice ?? '(default)'}  ·  subs: ${subs}`);
+console.log(`Project: ${cfg.name}  ·  mode: ${mode}  ·  format: ${format}  ·  scenes: ${selected.length}/${cfg.scenes.length}  ·  TTS: ${tts.backend}${tts.model ? `:${tts.model}` : ''}  ·  subs: ${subs}`);
 assertWithinBudget(tts.backend, tts.model || '*', totalChars, cap);
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
@@ -68,17 +92,17 @@ const audioDir = path.join(tmpDir, 'audio');
 mkdirSync(audioDir, { recursive: true });
 const videoDir = path.join(tmpDir, 'video');
 
-// ─── 1. Narrate ──────────────────────────────────────────────────────────────
-console.log(`[1/4] Narrating ${cfg.scenes.length} scenes via ${tts.backend}…`);
+// ─── 1. Narrate (only the selected scenes, in resolved order) ────────────────
+console.log(`[1/4] Narrating ${selected.length} scenes via ${tts.backend}…`);
 const enriched = [];
 let usedChars = 0;
-for (const [i, scene] of cfg.scenes.entries()) {
+for (const [i, scene] of selected.entries()) {
   const wavPath = path.join(audioDir, `scene-${String(i).padStart(2, '0')}.wav`);
   const { durationSec, charsUsed } = await narrate(scene.narration, tts, wavPath);
   usedChars += charsUsed;
   const sceneSec = durationSec + 0.2 /* preroll */ + 0.6 /* tail pad */;
   enriched.push({ ...scene, wavPath, audioSec: durationSec, sceneSec });
-  console.log(`  scene ${i}: ${durationSec.toFixed(1)}s  "${scene.narration.slice(0, 60)}…"`);
+  console.log(`  scene ${i} [${scene.id}]: ${durationSec.toFixed(1)}s  "${scene.narration.slice(0, 50)}…"`);
 }
 const totalAudio = enriched.reduce((s, x) => s + x.sceneSec, 0);
 console.log(`  total: ${totalAudio.toFixed(1)}s  ·  ${usedChars} chars`);
@@ -92,7 +116,7 @@ const rec = await record({
   videoDir,
   padSec: 0.6,
   deviceScaleFactor: cfg.deviceScaleFactor ?? 2,
-  cursor: mode !== 'simple',
+  cursor: cinematic,
 });
 console.log(`  video: ${rec.webmPath}  ·  clicks logged: ${rec.clicks.length}`);
 
@@ -116,7 +140,11 @@ if (mode === 'simple') {
     preset: cfg.video?.preset ?? 'slow',
   });
 } else {
-  console.log(`[4/4] Cinematic assembly (zoom + cards + logo + subs=${subs})…`);
+  const baseZoom = cfg.video?.zoom ?? 0.12;
+  // Shorts: snappier cards + punchier zoom for engagement.
+  const intro = isShort ? { ...cfg.intro, dur: 1.3 } : cfg.intro;
+  const outro = isShort ? { ...cfg.outro, dur: 1.8 } : cfg.outro;
+  console.log(`[4/4] Cinematic assembly (${format} · ${strategy} · subs=${subs})…`);
   await buildCinematic({
     webmPath: rec.webmPath,
     scenes: enriched,
@@ -127,15 +155,17 @@ if (mode === 'simple') {
     outMp4,
     srtPath: path.join(tmpDir, `${projectName}.srt`),
     opts: {
-      W: viewport.width,
-      H: viewport.height,
+      srcW: viewport.width,
+      srcH: viewport.height,
+      format,
+      strategy,
       fps: cfg.video?.fps ?? 30,
-      zoom: cfg.video?.zoom ?? 0.12,
+      zoom: isShort ? Math.max(baseZoom, 0.2) : baseZoom,
       logo: cfg.logo ? path.join(__dirname, cfg.logo) : null,
       logoOpacity: cfg.logoOpacity ?? 0.9,
       subtitles: subs,
-      intro: cfg.intro,
-      outro: cfg.outro,
+      intro,
+      outro,
     },
   });
 }
