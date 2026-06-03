@@ -179,11 +179,12 @@ if (mode === 'simple') {
     preset: cfg.video?.preset ?? 'slow',
   });
 } else {
-  const baseZoom = cfg.video?.zoom ?? 0.12;
+  const baseZoom = cfg.video?.zoom ?? 0.16;
   // Shorts: snappier cards + punchier zoom for engagement.
   const intro = isShort ? { ...cfg.intro, dur: 1.3 } : cfg.intro;
   const outro = isShort ? { ...cfg.outro, dur: 1.8 } : cfg.outro;
-  console.log(`[4/4] Cinematic assembly (${format} · ${strategy} · subs=${subs})…`);
+  const frame = flagMap.frame ? flagMap.frame !== 'off' : (cfg.video?.frame ?? true);
+  console.log(`[4/4] Cinematic assembly (${format} · ${frame ? 'framed' : strategy} · subs=${subs})…`);
   await buildCinematic({
     webmPath: rec.webmPath,
     scenes: enriched,
@@ -203,6 +204,8 @@ if (mode === 'simple') {
       logo: cfg.logo ? path.join(__dirname, cfg.logo) : null,
       logoOpacity: cfg.logoOpacity ?? 0.9,
       subtitles: subs,
+      frame,
+      frameCfg: cfg.frame || {},
       intro,
       outro,
     },
