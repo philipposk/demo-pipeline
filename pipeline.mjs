@@ -7,7 +7,7 @@
 // Loads projects/<project>.mjs, narrates each scene, records browser, merges.
 
 import 'dotenv/config';
-import { narrate } from './lib/narrate.mjs';
+import { narrate, narrateDialogue } from './lib/narrate.mjs';
 import { record } from './lib/record.mjs';
 import { buildNarrationTrack, muxToMp4 } from './lib/merge.mjs';
 import { buildCinematic } from './lib/effects.mjs';
@@ -93,8 +93,24 @@ const strategy = flagMap.strategy || cfg.strategy || 'blur';
 const subs = flagMap.subs || (isShort ? 'burn' : (cfg.subtitles || 'sidecar'));
 const suffix = flagMap.suffix || `${mode}-${format}-${tts.backend}`;
 
+// ─── Two-voice dialogue helpers (product-demo mode) ──────────────────────────
+// A scene may declare `dialogue: [{ role: 'user'|'assistant', text }]`. Each role is
+// spoken in its own voice (default: male user, female assistant) so the demo plays as a
+// live conversation while the real on-page assistant performs the actions.
+const DEFAULT_VOICES = {
+  user: { backend: 'edge', voice: 'en-US-AndrewMultilingualNeural' },      // male
+  assistant: { backend: 'edge', voice: 'en-US-AvaMultilingualNeural' },    // female
+};
+function dialogueText(scene) {
+  return (scene.dialogue || []).map((d) => d.text).join('  ');
+}
+function resolveTurnOpts(role) {
+  const v = (cfg.voices && cfg.voices[role]) || DEFAULT_VOICES[role] || DEFAULT_VOICES.assistant;
+  return { rate: tts.rate, speed: tts.speed, ...v };
+}
+
 // ─── Budget guard (only the SELECTED scenes are narrated) ─────────────────────
-const totalChars = selected.reduce((s, x) => s + x.narration.length, 0);
+const totalChars = selected.reduce((s, x) => s + (x.narration || dialogueText(x)).length, 0);
 const cap = parseFloat(process.env.MAX_COST_PER_VIDEO || '0.20');
 console.log(`Project: ${cfg.name}  ·  mode: ${mode}  ·  format: ${format}  ·  scenes: ${selected.length}/${cfg.scenes.length}  ·  TTS: ${tts.backend}${tts.model ? `:${tts.model}` : ''}  ·  subs: ${subs}`);
 assertWithinBudget(tts.backend, tts.model || '*', totalChars, cap);
@@ -114,11 +130,18 @@ const enriched = [];
 let usedChars = 0;
 for (const [i, scene] of selected.entries()) {
   const wavPath = path.join(audioDir, `scene-${String(i).padStart(2, '0')}.wav`);
-  const { durationSec, charsUsed } = await narrate(scene.narration, tts, wavPath);
+  let durationSec, charsUsed;
+  if (Array.isArray(scene.dialogue) && scene.dialogue.length) {
+    const turns = scene.dialogue.map((d) => ({ text: d.text, opts: resolveTurnOpts(d.role) }));
+    ({ durationSec, charsUsed } = await narrateDialogue(turns, wavPath, path.join(audioDir, `dlg-${String(i).padStart(2, '0')}`)));
+    scene.narration = dialogueText(scene); // for subtitles + logging
+  } else {
+    ({ durationSec, charsUsed } = await narrate(scene.narration, tts, wavPath));
+  }
   usedChars += charsUsed;
   const sceneSec = durationSec + 0.2 /* preroll */ + 0.6 /* tail pad */;
   enriched.push({ ...scene, wavPath, audioSec: durationSec, sceneSec });
-  console.log(`  scene ${i} [${scene.id}]: ${durationSec.toFixed(1)}s  "${scene.narration.slice(0, 50)}…"`);
+  console.log(`  scene ${i} [${scene.id}]: ${durationSec.toFixed(1)}s  "${(scene.narration || '').slice(0, 50)}…"`);
 }
 const totalAudio = enriched.reduce((s, x) => s + x.sceneSec, 0);
 console.log(`  total: ${totalAudio.toFixed(1)}s  ·  ${usedChars} chars`);
