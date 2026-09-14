@@ -5,3 +5,8 @@ tmp/
 output/
 *.log
 .DS_Store
+
+# Saved login sessions (live tokens) — never commit
+.auth/
+# Third-party brand assets (logos) — kept local, not in this public repo
+assets/brand/

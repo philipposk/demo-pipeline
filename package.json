@@ -6,7 +6,8 @@
   "description": "Generates click-through demo videos for projects. Playwright records + macOS say narrates + ffmpeg merges.",
   "scripts": {
     "demo": "node pipeline.mjs",
-    "install-browsers": "npx playwright install chromium"
+    "install-browsers": "npx playwright install chromium",
+    "login": "node pipeline.mjs login"
   },
   "dependencies": {
     "dotenv": "^17.4.2",

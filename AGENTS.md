@@ -121,9 +121,18 @@ node inspect.mjs
 | File | Responsibility |
 |---|---|
 | `lib/narrate.mjs` | Dispatches `narrate(text, opts, outWavPath)` to TTS backend. Returns `{durationSec, charsUsed}`. |
-| `lib/record.mjs` | `record(cfg)` — launches Playwright, steps through scenes, returns `.webm` path. |
+| `lib/record.mjs` | `record(cfg)` — launches Playwright, steps through scenes, returns `.webm` path. Optional: `storageState`, `saveStorageState`, `contextOptions`, `initScripts`, `beforeScenes`, `sceneCtx`. |
+| `lib/auth.mjs` | `login(cfg, statePath)` — headed browser, the human logs in, saves `.auth/<project>.json`. `assertLoggedIn()` fails fast when the session expired. |
+| `lib/mask.mjs` | `resolveMask(cfg.mask, flag)` + `maskInitScript(opts)` — blurs emails / ids / selectors in the page before recording. |
 | `lib/merge.mjs` | `buildNarrationTrack(scenes, outWav, workDir)` + `muxToMp4(cfg)` |
 | `lib/cost.mjs` | `assertWithinBudget(backend, model, chars, capUSD)` — throws if over budget. |
+
+## Apps behind a login
+
+- **Never type, store or ask for credentials.** Projects with an `auth` block reuse a session the human saved with `node pipeline.mjs login <project>` (headed browser, they log in themselves).
+- `.auth/` is git-ignored and chmod 600 — it holds live tokens. Never read it into logs or commit it.
+- Render fails with "Saved session is no longer valid" → ask the human to run the login command again.
+- `--preset=public` (scenes tagged `public`) needs no session — use it to smoke-test a project without logging in.
 
 ## Known issues / gotchas
 

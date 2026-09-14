@@ -81,17 +81,30 @@ node pipeline.mjs greenpert --tts=say             # macOS fallback
 node pipeline.mjs greenpert --mode=zoom --subs=burn
 ```
 
-Output: `output/<project>-demo-<mode>-<backend>.mp4` (+ `.srt` when `--subs=sidecar`)
+Output: `output/<project>-demo-<mode>-<format>-<backend>[-<preset>][-<lang>].mp4` (+ `.srt` when `--subs=sidecar`)
+
+## Deal Agent (`projects/dealagent.mjs`)
+
+```bash
+node pipeline.mjs login dealagent                                    # once: log in yourself with the DEMO fund account
+node pipeline.mjs dealagent --mode=zoom                              # 60–90 s landscape ad
+node pipeline.mjs dealagent --mode=short --preset=highlights         # 20–30 s vertical reel
+node pipeline.mjs dealagent --mode=zoom --format=square --preset=highlights
+node pipeline.mjs dealagent --mode=zoom --lang=da                    # Danish narration
+node pipeline.mjs dealagent --preset=public --mode=zoom              # login + signup pages only, no login needed
+```
+
+Record from a dedicated demo fund, never a customer's. The label, deal-move and Egon steps write to that account; `DEALAGENT_READONLY=1` skips every write. Logo: this repo is public, so the Valuer mark isn't committed. Copy `src/assets/valuer-logo22.png` from the frontend repo to `assets/brand/dealagent-logo.png` (git-ignored) to show it on the cards and as a watermark.
 
 ## TTS backends
 
 | Backend | Quality | Cost (~90s video) | Notes |
 |---|---|---|---|
-| `edge` | Very good | **Free** | Microsoft neural voices, no key. Voices: `en-US-AvaMultilingualNeural` `en-US-AndrewMultilingualNeural` `en-US-EmmaMultilingualNeural` `en-US-BrianMultilingualNeural`. Unofficial endpoint (auto-retries). |
+| `edge` | Very good | **Free** | Microsoft neural voices, no key. Voices: `en-US-AvaMultilingualNeural` `en-US-AndrewMultilingualNeural` `en-US-EmmaMultilingualNeural` `en-US-BrianMultilingualNeural`. Danish: `da-DK-ChristelNeural` `da-DK-JeppeNeural`. Unofficial endpoint (auto-retries); Microsoft publishes no terms for it. |
 | `openai` | Very good | ~$0.02 (`gpt-4o-mini-tts`) / ~$0.04 (`tts-1-hd`) | Voices: `alloy` `echo` `fable` `onyx` `nova` `shimmer` `sage` `coral` |
-| `kokoro` | Good | Free | Local 82M model, downloads once (~330 MB), fully offline. Voices: `af_bella` `am_michael` `bm_george` `bf_emma` |
-| `elevenlabs` | Excellent | ~$0.12 (turbo) | Needs Starter plan + API key with `text_to_speech` scope |
-| `say` | Robotic | Free | macOS only. Voices: `Samantha` `Daniel` `Karen` |
+| `kokoro` | Good | Free | Local 82M model, downloads once (~330 MB), fully offline. Voices: `af_bella` `am_michael` `bm_george` `bf_emma`. No Danish. |
+| `elevenlabs` | Excellent | ~$0.12 (turbo) | Needs Starter plan + API key with `text_to_speech` scope. Free tier is non-commercial. Speaks Danish (`eleven_multilingual_v2`, `eleven_flash_v2_5`). |
+| `say` | Robotic | Free | macOS only. Voices: `Samantha` `Daniel` `Karen`. Danish: `Sara`. |
 
 **Voice clone (your own voice):** Chatterbox (free, local, MIT) or ElevenLabs. Not yet wired — see `AGENTS.md` roadmap.
 
@@ -124,11 +137,49 @@ export default {
 
 Run `node inspect.mjs` first (edit the `routes` array inside) to screenshot every route and dump available buttons/links — helps you write accurate selectors.
 
+## Apps behind a login (no passwords in the pipeline)
+
+Add an `auth` block to the project (see `projects/dealagent.mjs`), then log in **once, yourself**:
+
+```bash
+node pipeline.mjs login <project>     # opens a real browser window; you log in; the session is saved
+node pipeline.mjs <project> ...       # every render starts logged in
+```
+
+- The session lands in `.auth/<project>.json` (git-ignored, chmod 600). It holds live login tokens: treat it like a password.
+- The pipeline never types, reads or stores credentials. It only reuses the browser session you created.
+- After each render the refreshed session is written back, so apps that rotate refresh tokens keep working.
+- A render that stops with "Saved session is no longer valid" just needs the `login` command again.
+- Scenes tagged `public` don't need the session: `--preset=public` renders without logging in.
+- Run one render at a time (renders share the saved session and `output/.cine-work`).
+
+## Privacy blur
+
+A project `mask` block blurs personal data inside the page before it is recorded, in every mode:
+
+```js
+mask: { emails: true, patterns: ['\\b\\d{6}-\\d{4}\\b'], selectors: ['[data-private]'], blurPx: 8 }
+```
+
+Emails and identity-provider user ids (`auth0|…`) are blurred by default; `patterns` and `selectors` add more. `--mask=off` turns it off for an internal cut.
+
+## Languages, short copy and other project options
+
+- Any scene text, and intro/outro `title`/`subtitle`, can be `{ en: '…', da: '…' }`. Pick with `--lang=da`; `ttsByLang` sets the voice per language.
+- `shortNarration` on a scene replaces its narration in `--mode=short` (reels need punchier lines).
+- `startUrl` on a scene: where recording starts when that scene comes first.
+- `viewports: { portrait, square }`: record vertical/square cuts at a smaller size so the UI reads larger.
+- `contextOptions` (Playwright context: colour scheme, locale, time zone) and `initScripts` (run in the page before the app's own scripts).
+- Scene actions get `(page, ctx)` with `ctx = { mode, format, lang, preset, state }`.
+- `--dry-run` also prints an estimated length, so presets can be tuned without rendering.
+
 ## Lib interface (for agents/contributors)
 
 ```
 lib/narrate.mjs   narrate(text, opts, outWavPath) → { durationSec, charsUsed }   (edge|openai|elevenlabs|kokoro|say)
 lib/record.mjs    record(cfg) → { webmPath, boundaries, clicks, bodyStart }       (injects cursor + logs clicks)
+lib/auth.mjs      login(cfg, statePath) · assertLoggedIn(page, auth, cmd)          (saved-session login, no credentials)
+lib/mask.mjs      resolveMask(cfg.mask, flag) · maskInitScript(opts)                (in-page privacy blur)
 lib/effects.mjs   buildCinematic({ webmPath, scenes, boundaries, clicks, ... })   (mode 2: zoom, cards, logo, subs)
 lib/subtitle.mjs  buildSrt(scenes, offsetSec, prerollSec) → SRT string
 lib/merge.mjs     buildNarrationTrack(...) · muxToMp4({...})                       (mode 1)

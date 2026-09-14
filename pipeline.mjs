@@ -3,6 +3,7 @@
 //   node pipeline.mjs <project>                 # uses cfg.tts default
 //   node pipeline.mjs <project> --tts=openai    # override backend
 //   node pipeline.mjs <project> --tts=elevenlabs --voice=Rachel
+//   node pipeline.mjs login <project>           # apps behind a login: log in once, session saved to .auth/
 //
 // Loads projects/<project>.mjs, narrates each scene, records browser, merges.
 
@@ -13,6 +14,8 @@ import { buildNarrationTrack, muxToMp4 } from './lib/merge.mjs';
 import { buildCinematic } from './lib/effects.mjs';
 import { resolveScenes } from './lib/select.mjs';
 import { assertWithinBudget } from './lib/cost.mjs';
+import { statePathFor, needsAuth, login, assertLoggedIn, stateExists } from './lib/auth.mjs';
+import { resolveMask, maskInitScript } from './lib/mask.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync, rmSync, existsSync } from 'node:fs';
@@ -21,16 +24,23 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ─── CLI parsing ─────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
-const projectName = args.find((a) => !a.startsWith('--'));
+const positionals = args.filter((a) => !a.startsWith('--'));
+const isLogin = positionals[0] === 'login';
+const projectName = isLogin ? positionals[1] : positionals[0];
 const flagMap = Object.fromEntries(
   args.filter((a) => a.startsWith('--')).map((a) => {
     const [k, v] = a.replace(/^--/, '').split('=');
     return [k, v ?? true];
   })
 );
+if (isLogin && !projectName) {
+  console.error('Usage: node pipeline.mjs login <project>   # opens a browser; you log in yourself; session saved to .auth/<project>.json');
+  process.exit(1);
+}
 if (!projectName && !flagMap.url) {
   console.error(`Usage: node pipeline.mjs <project> [options]
          node pipeline.mjs --url=https://site.com [options]   # auto-generate scenes
+         node pipeline.mjs login <project>                    # save a login session once (apps behind a login)
   --url=<live URL>               auto-discover nav + content, build the demo (no config file)
   --mode=simple|zoom|short       simple=plain · zoom=cinematic · short=vertical social cut
   --format=landscape|portrait|square|4:5
@@ -40,6 +50,8 @@ if (!projectName && !flagMap.url) {
   --order=id2,id1                explicit order
   --exclude=id3                  drop scenes
   --dry-run                      print resolved scene list, do not render
+  --lang=en|da                   narration language (scenes may carry { en, da } text)
+  --mask=off                     disable the project's privacy blur
   --tts=edge|openai|elevenlabs|kokoro|say   --voice=…  --model=…
   --subs=off|sidecar|burn        --suffix=…`);
   process.exit(1);
@@ -63,35 +75,70 @@ if (flagMap.url) {
   slug = projectName;
 }
 
+// ─── Login subcommand: headed browser, the human logs in, we save the session ─
+const statePath = cfg.auth ? statePathFor(cfg, slug, __dirname) : null;
+const loginCmd = `node pipeline.mjs login ${slug}`;
+if (isLogin) {
+  if (!cfg.auth) { console.error(`projects/${slug}.mjs has no auth config — nothing to log in to.`); process.exit(1); }
+  await login(cfg, statePath); // exits
+}
+
+// ─── Mode + language (needed before scene text is resolved) ──────────────────
+const mode = flagMap.mode || cfg.mode || 'simple';     // 'simple' | 'zoom' | 'short'
+const isShort = mode === 'short';
+const cinematic = mode !== 'simple';
+const lang = flagMap.lang || cfg.lang || 'en';
+// Text fields may be a string or a per-language map { en: '…', da: '…' }.
+const pick = (v) => (v == null || typeof v !== 'object' ? v : (v[lang] ?? v.en ?? Object.values(v)[0]));
+// Shorts use a scene's punchier `shortNarration` when it has one.
+cfg.scenes = cfg.scenes.map((s) => ({
+  ...s,
+  title: pick(s.title),
+  narration: pick(isShort && s.shortNarration ? s.shortNarration : s.narration),
+  ...(Array.isArray(s.dialogue) ? { dialogue: s.dialogue.map((d) => ({ ...d, text: pick(d.text) })) } : {}),
+}));
+
 // ─── Resolve which scenes to render (preset / explicit / order / exclude) ────
 const { selected, summary } = resolveScenes(cfg.scenes, flagMap, cfg);
 if (!selected.length) { console.error('No scenes selected.'); process.exit(1); }
+const useAuth = needsAuth(cfg, selected);
 if (flagMap['dry-run']) {
-  console.log(`Project: ${cfg.name}  ·  preset: ${flagMap.preset || 'full'}\nResolved ${selected.length}/${cfg.scenes.length} scenes:\n${summary}`);
+  const words = selected.reduce((n, s) => n + (s.narration || '').split(/\s+/).filter(Boolean).length, 0);
+  const cards = cinematic ? (isShort ? 1.3 + 1.8 : (cfg.intro?.dur ?? 2.8) + (cfg.outro?.dur ?? 3.2)) : 0;
+  const est = words / 2.45 + selected.length * 0.8 + cards; // edge neural voices measured 2.4–2.6 words/s
+  console.log(`Project: ${cfg.name}  ·  preset: ${flagMap.preset || 'full'}  ·  mode: ${mode}  ·  lang: ${lang}\nResolved ${selected.length}/${cfg.scenes.length} scenes:\n${summary}`);
+  console.log(`  ≈${Math.round(est)}s estimated (${words} words at ~2.45 words/s${cards ? ` + ${cards.toFixed(1)}s cards` : ''}; slow live-app steps can add more)`);
+  if (cfg.auth) {
+    console.log(`  login: ${useAuth ? 'needed' : 'not needed (public scenes only)'}  ·  saved session ${stateExists(statePath) ? 'found' : 'missing'}: ${path.relative(__dirname, statePath)}`);
+  }
   process.exit(0);
+}
+if (useAuth && !stateExists(statePath)) {
+  console.error(`This project needs a saved login session (${path.relative(__dirname, statePath)} is missing).\nRun once, log in yourself in the window that opens, then re-run:\n  ${loginCmd}`);
+  process.exit(1);
 }
 
 // ─── Resolve TTS opts (CLI overrides project defaults) ───────────────────────
-// If CLI changes backend, drop cfg.tts.voice/model — they belong to the cfg's backend, not the new one.
-const cfgBackend = cfg.tts?.backend || 'say';
+// A project may set per-language voices in cfg.ttsByLang; otherwise cfg.tts.
+// If CLI changes backend, drop the cfg voice/model — they belong to the cfg's backend, not the new one.
+const baseTts = cfg.ttsByLang?.[lang] || cfg.tts;
+const cfgBackend = baseTts?.backend || 'say';
 const resolvedBackend = flagMap.tts || cfgBackend;
 const inheritFromCfg = resolvedBackend === cfgBackend;
 const tts = {
   backend: resolvedBackend,
-  voice: flagMap.voice || (inheritFromCfg ? cfg.tts?.voice : undefined),
-  model: flagMap.model || (inheritFromCfg ? cfg.tts?.model : undefined),
-  rate: cfg.tts?.rate || 175,
-  speed: cfg.tts?.speed || 1.0,
+  voice: flagMap.voice || (inheritFromCfg ? baseTts?.voice : undefined),
+  model: flagMap.model || (inheritFromCfg ? baseTts?.model : undefined),
+  rate: baseTts?.rate || 175,
+  speed: baseTts?.speed || 1.0,
 };
-// ─── Mode / format / subtitles ───────────────────────────────────────────────
-const mode = flagMap.mode || cfg.mode || 'simple';     // 'simple' | 'zoom' | 'short'
-const isShort = mode === 'short';
-const cinematic = mode !== 'simple';
+// ─── Format / subtitles ──────────────────────────────────────────────────────
 const format = flagMap.format || cfg.format || (isShort ? 'portrait' : 'landscape');
 const strategy = flagMap.strategy || cfg.strategy || 'blur';
 // Shorts force burned captions (social autoplay is muted) unless CLI overrides.
 const subs = flagMap.subs || (isShort ? 'burn' : (cfg.subtitles || 'sidecar'));
-const suffix = flagMap.suffix || `${mode}-${format}-${tts.backend}`;
+const presetTag = flagMap.preset && flagMap.preset !== 'full' ? flagMap.preset : null;
+const suffix = flagMap.suffix || [mode, format, tts.backend, presetTag, lang !== 'en' ? lang : null].filter(Boolean).join('-');
 
 // ─── Two-voice dialogue helpers (product-demo mode) ──────────────────────────
 // A scene may declare `dialogue: [{ role: 'user'|'assistant', text }]`. Each role is
@@ -112,11 +159,12 @@ function resolveTurnOpts(role) {
 // ─── Budget guard (only the SELECTED scenes are narrated) ─────────────────────
 const totalChars = selected.reduce((s, x) => s + (x.narration || dialogueText(x)).length, 0);
 const cap = parseFloat(process.env.MAX_COST_PER_VIDEO || '0.20');
-console.log(`Project: ${cfg.name}  ·  mode: ${mode}  ·  format: ${format}  ·  scenes: ${selected.length}/${cfg.scenes.length}  ·  TTS: ${tts.backend}${tts.model ? `:${tts.model}` : ''}  ·  subs: ${subs}`);
+console.log(`Project: ${cfg.name}  ·  mode: ${mode}  ·  format: ${format}  ·  lang: ${lang}  ·  scenes: ${selected.length}/${cfg.scenes.length}  ·  TTS: ${tts.backend}${tts.model ? `:${tts.model}` : ''}  ·  subs: ${subs}`);
 assertWithinBudget(tts.backend, tts.model || '*', totalChars, cap);
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
-const viewport = cfg.viewport || { width: 1920, height: 1080 };
+// A project may record vertical/square cuts at a smaller viewport so the UI reads larger.
+const viewport = cfg.viewports?.[format] || cfg.viewport || { width: 1920, height: 1080 };
 const tmpDir = path.join(__dirname, 'tmp', `${slug}-${suffix}`);
 if (existsSync(tmpDir)) rmSync(tmpDir, { recursive: true, force: true });
 mkdirSync(tmpDir, { recursive: true });
@@ -147,15 +195,26 @@ const totalAudio = enriched.reduce((s, x) => s + x.sceneSec, 0);
 console.log(`  total: ${totalAudio.toFixed(1)}s  ·  ${usedChars} chars`);
 
 // ─── 2. Record browser ───────────────────────────────────────────────────────
-console.log(`[2/4] Recording browser flow at ${cfg.url} (viewport ${viewport.width}x${viewport.height})…`);
+// The first selected scene may start somewhere other than cfg.url (e.g. a public page).
+const startUrl = selected[0]?.startUrl || cfg.url;
+const maskOpts = resolveMask(cfg.mask, flagMap.mask);
+const initScripts = [...(cfg.initScripts || [])];
+if (maskOpts) initScripts.push({ fn: maskInitScript, arg: maskOpts });
+console.log(`[2/4] Recording browser flow at ${startUrl} (viewport ${viewport.width}x${viewport.height}${useAuth ? ' · saved login' : ''}${maskOpts ? ' · privacy blur on' : ''})…`);
 const rec = await record({
-  url: cfg.url,
+  url: startUrl,
   viewport,
   scenes: enriched,
   videoDir,
   padSec: 0.6,
   deviceScaleFactor: cfg.deviceScaleFactor ?? 2,
   cursor: cinematic,
+  storageState: useAuth ? statePath : null,
+  saveStorageState: useAuth ? statePath : null,
+  contextOptions: cfg.contextOptions || {},
+  initScripts,
+  beforeScenes: useAuth ? (page) => assertLoggedIn(page, cfg.auth, loginCmd) : (cfg.beforeScenes || null),
+  sceneCtx: { mode, format, lang, preset: flagMap.preset || 'full', state: {} },
 });
 console.log(`  video: ${rec.webmPath}  ·  clicks logged: ${rec.clicks.length}`);
 
@@ -180,9 +239,11 @@ if (mode === 'simple') {
   });
 } else {
   const baseZoom = cfg.video?.zoom ?? 0.16;
+  // Card text may also be per-language.
+  const cardText = (c) => (c ? { ...c, title: pick(c.title), subtitle: pick(c.subtitle) } : c);
   // Shorts: snappier cards + punchier zoom for engagement.
-  const intro = isShort ? { ...cfg.intro, dur: 1.3 } : cfg.intro;
-  const outro = isShort ? { ...cfg.outro, dur: 1.8 } : cfg.outro;
+  const intro = isShort ? { ...cardText(cfg.intro), dur: 1.3 } : cardText(cfg.intro);
+  const outro = isShort ? { ...cardText(cfg.outro), dur: 1.8 } : cardText(cfg.outro);
   const frame = flagMap.frame ? flagMap.frame !== 'off' : (cfg.video?.frame ?? true);
   console.log(`[4/4] Cinematic assembly (${format} · ${frame ? 'framed' : strategy} · subs=${subs})…`);
   await buildCinematic({
