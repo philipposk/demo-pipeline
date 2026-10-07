@@ -5,7 +5,7 @@
  "xf": 10,
  "voice": "openai:marin",
  "pace": "normal",
- "total": 513,
+ "total": 408,
  "scenes": [
   {
    "id": "hook",
@@ -95,7 +95,7 @@
    "tempo": 1,
    "wpm": 194,
    "from": 127,
-   "length": 180,
+   "length": 132,
    "voFrom": 133,
    "words": [
     {
@@ -163,9 +163,9 @@
    "dur": 4.078,
    "tempo": 1.12,
    "wpm": 177,
-   "from": 297,
-   "length": 216,
-   "voFrom": 303,
+   "from": 249,
+   "length": 159,
+   "voFrom": 255,
    "words": [
     {
      "w": "Tick",

@@ -4,7 +4,7 @@ import {FocusMap} from '../vertical';
 // The first key is the scene's opening framing. Keys whose word is not in a script's line are skipped.
 export const VFOCUS: FocusMap = {
   hook: [{x: 960, y: 570, z: 0.8}],
-  add: [{x: 960, y: 540, z: 0.9}, {x: 960, y: 580, z: 0.94, at: 'lands'}],
+  add: [{x: 960, y: 540, z: 0.86}, {x: 960, y: 580, z: 0.88, at: 'lands'}],
   done: [{x: 960, y: 540, z: 0.9}, {x: 960, y: 540, z: 0.88, at: 'acme', exact: true}],
 };
 

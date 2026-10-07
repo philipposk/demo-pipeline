@@ -7,7 +7,7 @@ Tasks** (an invented to-do app, `src/acme/`), shows the whole pattern. Read this
 **Why code, not a screen recording**
 - The UI is rebuilt from the product's real design tokens, so it stays sharp at 3-4x zoom.
 - Nothing logs into or waits on a live app.
-- Changing a line, the name or the theme means one edit and a re-render (the 17 s example renders in about 35 s).
+- Changing a line, the name or the theme means one edit and a re-render (the 14 s example renders in about 30 s).
 - Light, dark, silent-captioned and phone (9:16) cuts all come from the same scenes.
 
 **Tools and cost**
@@ -102,18 +102,20 @@ A product is a folder of scenes, a narration script, and two registry lines. Not
 ```json
 [
   {"id": "hook", "text": "Meet Acme Tasks. A to-do list that stays out of your way.", "minSec": 4.4},
-  {"id": "add",  "text": "Type a task, press enter, and it lands on your list.", "minSec": 6,
+  {"id": "add",  "text": "Type a task, press enter, and it lands on your list.", "minSec": 4.4,
    "caption": "Type a task, press enter: it lands on your list."},
-  {"id": "done", "text": "Tick it off when it's done. Acme Tasks. Less clutter, more done.", "minSec": 6, "holdSec": 1.2}
+  {"id": "done", "text": "Tick it off when it's done. Acme Tasks. Less clutter, more done.", "minSec": 4.6, "holdSec": 0.6}
 ]
 ```
 
 - `id`: the scene component key.
 - `text`: what is spoken.
-- `minSec`: minimum scene length, when the visuals need more time than the voice.
-- `holdSec`: extra hold at the end, usually on the end card.
+- `minSec`: minimum scene length, when the visuals need more time than the voice. Keep it near the voice length (see "No dead air" below).
+- `holdSec`: extra hold at the end, usually on the end card (about 0.6 s).
 - `caption`: the on-screen text for the silent cut (`""` for none).
 - `speed`: a minimum tempo, e.g. 1.08 for a line that sounds slow. It may exceed the pace's cap (1.12 normal).
+
+**No dead air.** Keep scene length minus (lead + voice) at about 1 s or less, unless an animated end card fills it. Any extra `minSec` needs matching motion (`Drift` in `lib.tsx` pushes in slowly on a held scene). `render.mjs` runs ffmpeg freezedetect after every render and prints a WARNING for any frozen stretch over 0.5 s (the last 0.6 s is ignored); fix every one. `STRICT_MOTION=1` makes it fail instead.
 
 Recommended structure: hook, name reveal, input, core output, organisation, unique features, sharing, end card with the name and a call to action. A repeating refrain gives rhythm.
 
@@ -139,7 +141,7 @@ const tName  = wi(1, 18);                // frame of the 2nd spoken word
 
 | Group | Exports |
 |---|---|
-| Motion | `Pop` (spring rise, scale and un-blur in; optional `out` blurs it away), `Shell` (scene dissolve plus slow camera drift; used by the Demo), `Bg` (drifting glows), `useSpring`, `lerp`, `SPRING` / `SNAP` / `BOUNCE` |
+| Motion | `Pop` (spring rise, scale and un-blur in; optional `out` blurs it away), `Drift` (slow push-in and float for a held scene), `Shell` (scene dissolve plus slow camera drift; used by the Demo), `Bg` (drifting glows), `useSpring`, `lerp`, `SPRING` / `SNAP` / `BOUNCE` |
 | Type | `Headline` (serif kinetic headlines), `Refrain` (big centred words, one per beat), `typed()` (typewriter text) |
 | UI | `Card`, `Chip`, `Dot`, `Eq` (3-bar equaliser), `Toggle`, and icons such as `IconUpload` and `IconMic`. Put the product's own logo in its folder (see `src/acme/kit.tsx`). |
 | Interaction | `Cursor` (glides along a path relative to its positioned parent, clicks with a ripple) and `Sfx` (click and whoosh sounds at a frame) |
@@ -209,10 +211,11 @@ node scripts/render.mjs <tag>:<theme>:<music>[:silent][:vertical] ...
 ```
 
 **QA every render**
-1. Read `out/sheet-<name>.jpg` (one frame near the end of each scene).
-2. Check that nothing is cropped wrongly and that no text or claim is inaccurate.
-3. Check that late animations are not cut off, and look at light and dark separately.
-4. Listen for glitches at pauses, a reveal that doesn't match the word, and music that is too loud. Music is ducked to 0.2 under the voice and rises to 0.42 in the gaps.
+1. Check the freeze warning (see "No dead air" in 4.2) and fix anything over 0.5 s.
+2. Read `out/sheet-<name>.jpg` (one frame near the end of each scene).
+3. Check that nothing is cropped wrongly and that no text or claim is inaccurate.
+4. Check that late animations are not cut off, and look at light and dark separately.
+5. Listen for glitches at pauses, a reveal that doesn't match the word, and music that is too loud. Music is ducked to 0.2 under the voice and rises to 0.42 in the gaps.
 
 **Audio check:** `ffmpeg -i X.mp4 -af volumedetect -f null -`.
 

@@ -41,6 +41,7 @@ Create `src/scripts/<id>.json`: a list of `{id, text, minSec?, holdSec?, caption
 - No hard pause after a single word ("One: ..."); write "First, ...". The pause cap clips it.
 - Say the product name in the reveal and on the end card.
 - Give each line a `caption` for the silent cut.
+- No dead air: keep scene length minus (lead + voice) at about 1 s or less, unless an animated end card fills it. Any extra `minSec` needs matching motion (`Drift`).
 - Show the script to the user for approval before spending on voice.
 
 ## 4. Voice
@@ -88,7 +89,7 @@ node scripts/render.mjs <tag>:light ... <tag>:dark ... <tag>:light::vertical <ta
 # format: <tag>:<theme>:<music>[:silent][:vertical]
 ```
 
-Run one render at a time. Each writes `out/<name>.mp4` and a contact sheet `out/sheet-<name>.jpg`; read the sheet. Check audio levels with `ffmpeg -i X.mp4 -af volumedetect -f null -`. Music is optional: none ships. To add one, follow README section 7 (royalty-free source whose licence you have read, loudnorm, save in `public/music/`, record in `SOURCES.txt`). Delete old renders from `out/` when done.
+Run one render at a time. After every render check the freeze warning (ffmpeg freezedetect) and fix anything frozen over 0.5 s (cut `minSec`/`holdSec`, or add motion); `STRICT_MOTION=1` makes it fail. Each writes `out/<name>.mp4` and a contact sheet `out/sheet-<name>.jpg`; read the sheet. Check audio levels with `ffmpeg -i X.mp4 -af volumedetect -f null -`. Music is optional: none ships. To add one, follow README section 7 (royalty-free source whose licence you have read, loudnorm, save in `public/music/`, record in `SOURCES.txt`). Delete old renders from `out/` when done.
 
 ## 9. Web copies and poster
 

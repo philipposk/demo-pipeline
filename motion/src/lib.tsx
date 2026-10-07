@@ -72,6 +72,18 @@ export const Shell: React.FC<{length: number; xf: number; last?: boolean; childr
   );
 };
 
+// Slow continuous camera for a held moment: eased push-in over `length` frames plus a small float, so a scene never sits frozen.
+export const Drift: React.FC<{length: number; zoom?: number; float?: number; children: React.ReactNode}> = ({length, zoom = 0.07, float = 12, children}) => {
+  const f = useCurrentFrame();
+  const t = f / 30;
+  const z = 1 + zoom * interpolate(f, [0, length], [0, 1], {...CL, easing: Easing.inOut(Easing.sin)});
+  return (
+    <AbsoluteFill style={{transform: `translate(${Math.cos(t * 0.8) * float * 0.7}px, ${Math.sin(t * 1.1) * float}px) scale(${z})`}}>
+      {children}
+    </AbsoluteFill>
+  );
+};
+
 // Spring-in element (rise + scale + un-blur), optional blur-out at `out`.
 export const Pop: React.FC<{
   at: number; children: React.ReactNode; dy?: number; dx?: number; scaleFrom?: number; blur?: number;

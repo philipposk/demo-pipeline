@@ -1,7 +1,7 @@
 import React from 'react';
 import {AbsoluteFill, interpolate, useCurrentFrame} from 'remotion';
 import {C, INTER} from '../theme';
-import {CL, Card, Cursor, Headline, Pop, SNAP, SceneProps, Sfx, lerp, typed, useSpring, useTiming} from '../lib';
+import {CL, Card, Cursor, Drift, Headline, Pop, SNAP, SceneProps, Sfx, lerp, typed, useSpring, useTiming} from '../lib';
 import {CARD, Counter, Mark, ROW_H, TaskRow} from './kit';
 
 // Invented data: a short to-do list and one new task.
@@ -28,7 +28,7 @@ export const Hook: React.FC<SceneProps> = ({sc}) => {
   const left = 960 - (MARK + GAP + WORD) / 2;
   const markX = interpolate(slide, [0, 1], [960 - MARK / 2, left]);
   return (
-    <AbsoluteFill>
+    <Drift length={sc.length} zoom={0.08}>
       <div style={{position: 'absolute', left: markX, top: 460 - MARK / 2, opacity: Math.min(1, markIn * 2),
         transform: `scale(${0.3 + 0.7 * markIn}) rotate(${(1 - markIn) * -14}deg)`}}>
         <Mark size={MARK} draw={lerp(f, 8, 24, 0, 1)} />
@@ -45,7 +45,7 @@ export const Hook: React.FC<SceneProps> = ({sc}) => {
           <Headline size={68} italic color={C.text2}>A to-do list that stays out of your way.</Headline>
         </Pop>
       </div>
-    </AbsoluteFill>
+    </Drift>
   );
 };
 
@@ -87,24 +87,26 @@ export const Add: React.FC<SceneProps> = ({sc}) => {
   const enterPress = f >= tEnter && f < tEnter + 8 ? 1 : 0;
   const fresh = interpolate(f, [tEnter + 8, tEnter + 24, tLands + 30, tLands + 46], [0, 1, 1, 0], CL);
   return (
-    <AbsoluteFill style={{alignItems: 'center', justifyContent: 'center'}}>
-      <Pop at={0} dy={50} scaleFrom={0.94}>
-        <div style={{position: 'relative', transform: 'scale(1.18)'}}>
-          <AppCard left={sent ? 4 : 3} typedText={sent ? '' : text} focus={sent ? 0 : focus} enter={enterPress}>
-            <div style={{height: ROW_H * 4, overflow: 'hidden'}}>
-              <div style={{height: ROW_H * grow, overflow: 'hidden', opacity: grow}}>
-                <div style={{transform: `translateY(${(1 - grow) * -20}px)`}}><TaskRow {...NEW_TASK} fresh={fresh} /></div>
+    <Drift length={sc.length} zoom={0.05}>
+      <AbsoluteFill style={{alignItems: 'center', justifyContent: 'center'}}>
+        <Pop at={0} dy={50} scaleFrom={0.94}>
+          <div style={{position: 'relative', transform: 'scale(1.18)'}}>
+            <AppCard left={sent ? 4 : 3} typedText={sent ? '' : text} focus={sent ? 0 : focus} enter={enterPress}>
+              <div style={{height: ROW_H * 4, overflow: 'hidden'}}>
+                <div style={{height: ROW_H * grow, overflow: 'hidden', opacity: grow}}>
+                  <div style={{transform: `translateY(${(1 - grow) * -20}px)`}}><TaskRow {...NEW_TASK} fresh={fresh} /></div>
+                </div>
+                {TASKS.map((t) => <TaskRow key={t.title} {...t} />)}
               </div>
-              {TASKS.map((t) => <TaskRow key={t.title} {...t} />)}
-            </div>
-          </AppCard>
-          <Cursor path={[{f: 0, x: 860, y: 520}, {f: tClick - 3, x: 360, y: CARD.inputTop + CARD.inputH / 2}, {f: tEnter - 6, x: 380, y: CARD.inputTop + CARD.inputH / 2 + 6},
-            {f: tLands + 18, x: 600, y: 430}]} clicks={[tClick]} />
-        </div>
-      </Pop>
-      <Sfx at={tClick} src="sfx/click.wav" />
-      <Sfx at={tEnter} src="sfx/click.wav" />
-    </AbsoluteFill>
+            </AppCard>
+            <Cursor path={[{f: 0, x: 860, y: 520}, {f: tClick - 3, x: 360, y: CARD.inputTop + CARD.inputH / 2}, {f: tEnter - 6, x: 380, y: CARD.inputTop + CARD.inputH / 2 + 6},
+              {f: tLands + 18, x: 600, y: 430}]} clicks={[tClick]} />
+          </div>
+        </Pop>
+        <Sfx at={tClick} src="sfx/click.wav" />
+        <Sfx at={tEnter} src="sfx/click.wav" />
+      </AbsoluteFill>
+    </Drift>
   );
 };
 
@@ -127,34 +129,36 @@ export const Done: React.FC<SceneProps> = ({sc}) => {
   const left = 960 - (MARK + GAP + WORD) / 2;
   const rows = [NEW_TASK, ...TASKS];
   return (
-    <AbsoluteFill style={{alignItems: 'center', justifyContent: 'center'}}>
-      <Pop at={0} dy={0} scaleFrom={0.97} out={out}>
-        <div style={{position: 'relative', transform: 'scale(1.18)'}}>
-          <AppCard left={done > 0.5 ? 3 : 4}>
-            <div style={{height: ROW_H * 4, overflow: 'hidden'}}>
-              {rows.map((t, i) => <TaskRow key={t.title} {...t} done={i === 0 ? done : 0} />)}
-            </div>
-          </AppCard>
-          <Cursor path={[{f: 0, x: 700, y: 540}, {f: tTick - 3, x: 76, y: CARD.listTop + ROW_H / 2}, {f: tTick + 24, x: 330, y: CARD.listTop + ROW_H * 2}]} clicks={[tTick]} />
-        </div>
-      </Pop>
-      <div style={{position: 'absolute', left: left, top: 470 - MARK / 2, opacity: Math.min(1, logoIn * 2),
-        transform: `scale(${0.3 + 0.7 * logoIn}) rotate(${(1 - logoIn) * -14}deg)`}}>
-        <Mark size={MARK} draw={lerp(f, tName + 4, tName + 18, 0, 1)} />
-      </div>
-      <div style={{position: 'absolute', left: left + MARK + GAP, top: 470 - 90, height: 180, display: 'flex', alignItems: 'center',
-        clipPath: `inset(-20px ${(1 - reveal) * 100}% -20px 0)`}}>
-        <div style={{fontFamily: INTER, fontWeight: 700, fontSize: 128, letterSpacing: '-0.045em', color: C.text, whiteSpace: 'nowrap',
-          transform: `translateX(${(1 - reveal) * -60}px)`}}>
-          Acme Tasks
-        </div>
-      </div>
-      <div style={{position: 'absolute', top: 640, left: 0, right: 0, display: 'flex', justifyContent: 'center'}}>
-        <Pop at={tLine} dy={30}>
-          <Headline size={80} italic color={C.text2}>Less clutter, more done.</Headline>
+    <Drift length={sc.length} zoom={0.1}>
+      <AbsoluteFill style={{alignItems: 'center', justifyContent: 'center'}}>
+        <Pop at={0} dy={0} scaleFrom={0.97} out={out}>
+          <div style={{position: 'relative', transform: 'scale(1.18)'}}>
+            <AppCard left={done > 0.5 ? 3 : 4}>
+              <div style={{height: ROW_H * 4, overflow: 'hidden'}}>
+                {rows.map((t, i) => <TaskRow key={t.title} {...t} done={i === 0 ? done : 0} />)}
+              </div>
+            </AppCard>
+            <Cursor path={[{f: 0, x: 700, y: 540}, {f: tTick - 3, x: 76, y: CARD.listTop + ROW_H / 2}, {f: tTick + 24, x: 330, y: CARD.listTop + ROW_H * 2}]} clicks={[tTick]} />
+          </div>
         </Pop>
-      </div>
-      <Sfx at={tTick} src="sfx/click.wav" />
-    </AbsoluteFill>
+        <div style={{position: 'absolute', left: left, top: 470 - MARK / 2, opacity: Math.min(1, logoIn * 2),
+          transform: `scale(${0.3 + 0.7 * logoIn}) rotate(${(1 - logoIn) * -14}deg)`}}>
+          <Mark size={MARK} draw={lerp(f, tName + 4, tName + 18, 0, 1)} />
+        </div>
+        <div style={{position: 'absolute', left: left + MARK + GAP, top: 470 - 90, height: 180, display: 'flex', alignItems: 'center',
+          clipPath: `inset(-20px ${(1 - reveal) * 100}% -20px 0)`}}>
+          <div style={{fontFamily: INTER, fontWeight: 700, fontSize: 128, letterSpacing: '-0.045em', color: C.text, whiteSpace: 'nowrap',
+            transform: `translateX(${(1 - reveal) * -60}px)`}}>
+            Acme Tasks
+          </div>
+        </div>
+        <div style={{position: 'absolute', top: 640, left: 0, right: 0, display: 'flex', justifyContent: 'center'}}>
+          <Pop at={tLine} dy={30}>
+            <Headline size={80} italic color={C.text2}>Less clutter, more done.</Headline>
+          </Pop>
+        </div>
+        <Sfx at={tTick} src="sfx/click.wav" />
+      </AbsoluteFill>
+    </Drift>
   );
 };
