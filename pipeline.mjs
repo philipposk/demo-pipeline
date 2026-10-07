@@ -33,6 +33,8 @@ if (!projectName && !flagMap.url) {
          node pipeline.mjs --url=https://site.com [options]   # auto-generate scenes
   --url=<live URL>               auto-discover nav + content, build the demo (no config file)
   --mode=simple|zoom|short       simple=plain · zoom=cinematic · short=vertical social cut
+  --mode=studio                  sharp capture composed in Remotion (camera, cursor, word captions, cards)
+                                 studio options: --viewport=1600x900 --zoom=1.7 --music=<file> --subs=off
   --format=landscape|portrait|square|4:5
   --strategy=blur|crop           vertical fit: blur=keep all · crop=follow click
   --preset=full|highlights|basic which scenes to include
@@ -130,21 +132,71 @@ const enriched = [];
 let usedChars = 0;
 for (const [i, scene] of selected.entries()) {
   const wavPath = path.join(audioDir, `scene-${String(i).padStart(2, '0')}.wav`);
-  let durationSec, charsUsed;
+  let durationSec, charsUsed, words;
   if (Array.isArray(scene.dialogue) && scene.dialogue.length) {
     const turns = scene.dialogue.map((d) => ({ text: d.text, opts: resolveTurnOpts(d.role) }));
     ({ durationSec, charsUsed } = await narrateDialogue(turns, wavPath, path.join(audioDir, `dlg-${String(i).padStart(2, '0')}`)));
     scene.narration = dialogueText(scene); // for subtitles + logging
   } else {
-    ({ durationSec, charsUsed } = await narrate(scene.narration, tts, wavPath));
+    ({ durationSec, charsUsed, words } = await narrate(scene.narration, tts, wavPath));
   }
   usedChars += charsUsed;
   const sceneSec = durationSec + 0.2 /* preroll */ + 0.6 /* tail pad */;
-  enriched.push({ ...scene, wavPath, audioSec: durationSec, sceneSec });
+  enriched.push({ ...scene, wavPath, audioSec: durationSec, sceneSec, words });
   console.log(`  scene ${i} [${scene.id}]: ${durationSec.toFixed(1)}s  "${(scene.narration || '').slice(0, 50)}…"`);
 }
 const totalAudio = enriched.reduce((s, x) => s + x.sceneSec, 0);
 console.log(`  total: ${totalAudio.toFixed(1)}s  ·  ${usedChars} chars`);
+
+// ─── Studio mode: sharp capture → Remotion composition (motion/src/studio) ───
+if (mode === 'studio') {
+  const { capture } = await import('./lib/capture.mjs');
+  const { renderStudio } = await import('./lib/studio.mjs');
+  const [vw, vh] = String(flagMap.viewport || cfg.studio?.viewport || '1600x900').split('x').map(Number);
+  const studioViewport = { width: vw, height: vh };
+  console.log(`[2/3] Capturing ${cfg.url} (viewport ${vw}x${vh} @${cfg.studio?.dpr ?? 2}x)…`);
+  const cap = await capture({
+    url: cfg.url,
+    viewport: studioViewport,
+    scenes: enriched,
+    workDir: path.join(tmpDir, 'capture'),
+    dpr: cfg.studio?.dpr ?? 2,
+    padSec: 0.6,
+    storageState: cfg.storageState,
+    hideSelectors: cfg.hideSelectors,
+  });
+  const outDir = path.join(__dirname, 'output');
+  mkdirSync(outDir, { recursive: true });
+  const outMp4 = path.join(outDir, `${slug}-demo-${suffix}.mp4`);
+  const u = new URL(cfg.url);
+  console.log(`[3/3] Composing in Remotion…`);
+  await renderStudio({
+    cap,
+    scenes: enriched,
+    slug,
+    outMp4,
+    look: {
+      title: cfg.intro?.title ?? cfg.name,
+      subtitle: cfg.intro?.subtitle ?? '',
+      outroTitle: cfg.outro?.title ?? cfg.name,
+      outroSubtitle: cfg.outro?.subtitle ?? u.hostname,
+      colors: cfg.studio?.colors || cfg.frame?.colors,
+      accent: cfg.studio?.accent,
+      logo: cfg.logo ? path.join(__dirname, cfg.logo) : null,
+      watermark: flagMap.watermark !== 'off' && cfg.studio?.watermark !== false,
+      address: (u.hostname + u.pathname).replace(/^www\./, '').replace(/\/$/, ''),
+      music: flagMap.music && flagMap.music !== 'off' ? path.resolve(flagMap.music) : (cfg.studio?.music ? path.join(__dirname, cfg.studio.music) : null),
+      musicGain: cfg.studio?.musicGain,
+      zoom: flagMap.zoom ? Number(flagMap.zoom) : cfg.studio?.zoom,
+      captions: flagMap.subs !== 'off' && cfg.studio?.captions !== false,
+      introSec: cfg.intro?.dur ? Math.min(cfg.intro.dur, 2.8) : undefined,
+      outroSec: cfg.outro?.dur ? Math.min(cfg.outro.dur, 3.2) : undefined,
+      concurrency: flagMap.concurrency,
+    },
+  });
+  console.log(`\nDone. → ${outMp4}`);
+  process.exit(0);
+}
 
 // ─── 2. Record browser ───────────────────────────────────────────────────────
 console.log(`[2/4] Recording browser flow at ${cfg.url} (viewport ${viewport.width}x${viewport.height})…`);

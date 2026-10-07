@@ -11,11 +11,32 @@ Generates a click-through demo video for a web app. Playwright records the brows
 | `simple` | Plain continuous screen recording + narration. Fast. |
 | `zoom` | Cinematic landscape: per-scene push-in zoom toward each click, animated fake cursor + click ripple, intro & outro title cards, logo watermark, subtitles. |
 | `short` | Vertical social cut (TikTok/Reels/Shorts): portrait 9:16, punchier zoom, snappy cards, big burned captions. Pair with `--preset=highlights` for a fast, engaging clip. |
+| `studio` | Highest quality, landscape. A sharp capture (Chrome screencast at 2× resolution) composed in Remotion: browser window on a gradient, camera that springs to each click and frames its row/toolbar, drawn cursor with click ripples, each click landing on its narration word, word-lit captions, animated intro/outro, click and transition sounds, optional ducked music. Needs `cd motion && npm install` once. |
 
 ```bash
 node pipeline.mjs greenpert --mode=zoom                      # landscape cinematic
 node pipeline.mjs greenpert --mode=short --preset=highlights  # vertical reel
+node pipeline.mjs todomvc --mode=studio                       # studio quality (public demo site)
 ```
+
+### Studio mode
+
+```bash
+cd motion && npm install && cd ..        # once: Remotion
+node pipeline.mjs todomvc --mode=studio
+node pipeline.mjs --url=https://site.com --mode=studio
+```
+
+Options: `--viewport=1600x900` (CSS size of the captured browser; captured at 2×), `--zoom=1.7` (max camera zoom),
+`--music=<file>` (ducked under the voice), `--subs=off` (no captions), `--watermark=off`, `--concurrency=<n>` (Remotion).
+A scene may set `cue: 'word'` so its first click lands on that spoken word; without it, the click lands on the first
+narration word that matches the clicked element's label (e.g. "Active" for an Active link). Project configs can set
+`studio: { viewport, dpr, zoom, colors, accent, music, musicGain, captions, watermark }`.
+
+Word timings come free with `--tts=edge`; other voices fall back to estimated timings (captions still follow the voice,
+cue matching is a little less exact). Render time is about 6× the video length on an M2 laptop (35 s video ≈ 3.5 min),
+plus the capture itself (real time). No API cost beyond the voice. Remotion is free for individuals and companies of
+up to 3 people; larger companies need a Remotion company licence.
 
 ## Aspect ratios
 
@@ -130,6 +151,8 @@ Run `node inspect.mjs` first (edit the `routes` array inside) to screenshot ever
 lib/narrate.mjs   narrate(text, opts, outWavPath) → { durationSec, charsUsed }   (edge|openai|elevenlabs|kokoro|say)
 lib/record.mjs    record(cfg) → { webmPath, boundaries, clicks, bodyStart }       (injects cursor + logs clicks)
 lib/effects.mjs   buildCinematic({ webmPath, scenes, boundaries, clicks, ... })   (mode 2: zoom, cards, logo, subs)
+lib/capture.mjs   capture(cfg) → { videoPath, css, dpr, boundaries, events }      (studio: sharp CDP screencast + click/typing/scroll log)
+lib/studio.mjs    buildPlan(cap, scenes, o) · renderStudio({...})                 (studio: timing plan → Remotion motion/src/studio)
 lib/subtitle.mjs  buildSrt(scenes, offsetSec, prerollSec) → SRT string
 lib/merge.mjs     buildNarrationTrack(...) · muxToMp4({...})                       (mode 1)
 lib/cost.mjs      assertWithinBudget(backend, model, chars, capUSD)

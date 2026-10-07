@@ -4,6 +4,7 @@ import PRODUCTS from './products.json';
 import {DEMOS} from './products';
 import {TIMELINES} from './timelines';
 import {DemoProps, timelineOf} from './types';
+import {Studio, studioDefaults, studioMetadata} from './studio/Studio';
 
 // One composition per narration timeline (src/timelines/<tag>.json), with the id "<Product>-<tag>". The timeline's
 // "script" picks the product through src/products.json, which scripts/render.mjs reads too. Theme and music are props:
@@ -33,5 +34,8 @@ export const RemotionRoot: React.FC = () => (
         </React.Fragment>
       );
     })}
+    {/* Studio mode: a real screen capture composed by the pipeline (node pipeline.mjs <project> --mode=studio passes all props). */}
+    <Composition id="Studio" component={Studio} durationInFrames={studioDefaults.total} fps={30} width={1920} height={1080}
+      defaultProps={studioDefaults} calculateMetadata={studioMetadata} />
   </>
 );
