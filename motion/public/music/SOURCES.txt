@@ -1,0 +1,2 @@
+Music: Mixkit Stock Music Free License (https://mixkit.co/license/#musicFree)
+- pop-track-03.mp3 = "Pop Track 03" by Lily J (mixkit id 729): the default music of Catchy in src/products.json. Not committed; download it and loudness-normalise it to -16 LUFS (README, section 7).

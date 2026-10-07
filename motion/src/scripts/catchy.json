@@ -1,0 +1,21 @@
+[
+  {"id": "hook", "text": "Meetings. Lectures. Calls. You remember maybe half.", "minSec": 4.9},
+  {"id": "reveal", "text": "Meet Catchy. It catches the rest."},
+  {"id": "capture", "text": "Drop in a recording, paste a YouTube link, or just hit live.", "minSec": 5.6,
+    "caption": "Drop in a recording, paste a YouTube link, or go live."},
+  {"id": "transcript", "text": "Every word, every speaker. Tap any word to hear that exact moment.", "minSec": 5.4,
+    "caption": "Every speaker, labelled. Tap any word to hear that moment."},
+  {"id": "notes", "text": "Every to-do. The notes write themselves: decisions, owners, deadlines.", "minSec": 5.4,
+    "caption": "Notes write themselves: decisions, owners, deadlines."},
+  {"id": "templates", "text": "Standup, sales call, lecture: notes shaped to fit.", "minSec": 3.8,
+    "caption": "Eight note templates, from standups to lectures."},
+  {"id": "memory", "text": "Folders remember your context: briefs, docs, past meetings.", "minSec": 4.2,
+    "caption": "Add briefs and docs to a folder. Every meeting there builds on them."},
+  {"id": "live", "text": "Every answer. Someone asks mid-call, and the answer pops up, from your own meetings and files.", "minSec": 6,
+    "caption": "Someone asks mid-call. The answer pops up, from your own meetings and files."},
+  {"id": "agents", "text": "Plug in Claude, Cursor or Codex. They follow along and answer from your code.", "minSec": 5,
+    "caption": "Connect Claude, Cursor or Codex. They follow along and answer from your code."},
+  {"id": "share", "text": "Share just the notes, or export to PDF, Word or Markdown.", "minSec": 4.6,
+    "caption": "Share just the notes, or export to PDF, Word or Markdown."},
+  {"id": "end", "text": "Catchy. Catch everything. Start free.", "holdSec": 1.8}
+]

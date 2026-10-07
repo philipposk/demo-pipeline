@@ -1,0 +1,717 @@
+{
+ "tag": "catchy",
+ "script": "catchy",
+ "fps": 30,
+ "xf": 10,
+ "voice": "openai:marin",
+ "pace": "normal",
+ "total": 1570,
+ "scenes": [
+  {
+   "id": "hook",
+   "text": "Meetings. Lectures. Calls. You remember maybe half.",
+   "file": "voice/catchy/hook.wav",
+   "dur": 3.752,
+   "tempo": 1.12,
+   "wpm": 112,
+   "from": 0,
+   "length": 147,
+   "voFrom": 6,
+   "words": [
+    {
+     "w": "Meetings,",
+     "s": 0,
+     "e": 0.8
+    },
+    {
+     "w": "lectures,",
+     "s": 0.8,
+     "e": 1.68
+    },
+    {
+     "w": "calls,",
+     "s": 1.76,
+     "e": 2.48
+    },
+    {
+     "w": "you",
+     "s": 2.48,
+     "e": 2.64
+    },
+    {
+     "w": "remember",
+     "s": 2.64,
+     "e": 2.96
+    },
+    {
+     "w": "maybe",
+     "s": 2.96,
+     "e": 3.36
+    },
+    {
+     "w": "half.",
+     "s": 3.36,
+     "e": 3.68
+    }
+   ]
+  },
+  {
+   "id": "reveal",
+   "text": "Meet Catchy. It catches the rest.",
+   "file": "voice/catchy/reveal.wav",
+   "dur": 2.596,
+   "tempo": 1.12,
+   "wpm": 139,
+   "from": 137,
+   "length": 96,
+   "voFrom": 143,
+   "words": [
+    {
+     "w": "Meat",
+     "s": 0.08,
+     "e": 0.4
+    },
+    {
+     "w": "catchy",
+     "s": 0.4,
+     "e": 1.28
+    },
+    {
+     "w": "it",
+     "s": 1.28,
+     "e": 1.6
+    },
+    {
+     "w": "catches",
+     "s": 1.6,
+     "e": 2
+    },
+    {
+     "w": "the",
+     "s": 2,
+     "e": 2.24
+    },
+    {
+     "w": "rest",
+     "s": 2.24,
+     "e": 3.2
+    }
+   ]
+  },
+  {
+   "id": "capture",
+   "text": "Drop in a recording, paste a YouTube link, or just hit live.",
+   "caption": "Drop in a recording, paste a YouTube link, or go live.",
+   "file": "voice/catchy/capture.wav",
+   "dur": 3.816,
+   "tempo": 1,
+   "wpm": 189,
+   "from": 223,
+   "length": 168,
+   "voFrom": 229,
+   "words": [
+    {
+     "w": "Drop",
+     "s": 0,
+     "e": 0.32
+    },
+    {
+     "w": "in",
+     "s": 0.32,
+     "e": 0.48
+    },
+    {
+     "w": "a",
+     "s": 0.48,
+     "e": 0.64
+    },
+    {
+     "w": "recording,",
+     "s": 0.64,
+     "e": 1.36
+    },
+    {
+     "w": "paste",
+     "s": 1.36,
+     "e": 1.6
+    },
+    {
+     "w": "a",
+     "s": 1.6,
+     "e": 1.76
+    },
+    {
+     "w": "YouTube",
+     "s": 1.76,
+     "e": 2.08
+    },
+    {
+     "w": "link,",
+     "s": 2.08,
+     "e": 2.72
+    },
+    {
+     "w": "or",
+     "s": 2.72,
+     "e": 2.88
+    },
+    {
+     "w": "just",
+     "s": 2.88,
+     "e": 3.12
+    },
+    {
+     "w": "hit",
+     "s": 3.12,
+     "e": 3.36
+    },
+    {
+     "w": "live.",
+     "s": 3.36,
+     "e": 3.68
+    }
+   ]
+  },
+  {
+   "id": "transcript",
+   "text": "Every word, every speaker. Tap any word to hear that exact moment.",
+   "caption": "Every speaker, labelled. Tap any word to hear that moment.",
+   "file": "voice/catchy/transcript.wav",
+   "dur": 5.681,
+   "tempo": 1.12,
+   "wpm": 127,
+   "from": 381,
+   "length": 189,
+   "voFrom": 387,
+   "words": [
+    {
+     "w": "Every",
+     "s": 0,
+     "e": 0.72
+    },
+    {
+     "w": "word,",
+     "s": 0.72,
+     "e": 1.44
+    },
+    {
+     "w": "every",
+     "s": 1.6,
+     "e": 2
+    },
+    {
+     "w": "speaker,",
+     "s": 2,
+     "e": 2.8
+    },
+    {
+     "w": "tap",
+     "s": 2.88,
+     "e": 3.2
+    },
+    {
+     "w": "any",
+     "s": 3.2,
+     "e": 3.6
+    },
+    {
+     "w": "word",
+     "s": 3.6,
+     "e": 4
+    },
+    {
+     "w": "to",
+     "s": 4,
+     "e": 4.32
+    },
+    {
+     "w": "hear",
+     "s": 4.32,
+     "e": 4.56
+    },
+    {
+     "w": "that",
+     "s": 4.56,
+     "e": 4.72
+    },
+    {
+     "w": "exact",
+     "s": 4.72,
+     "e": 5.12
+    },
+    {
+     "w": "moment.",
+     "s": 5.12,
+     "e": 5.6
+    }
+   ]
+  },
+  {
+   "id": "notes",
+   "text": "Every to-do. The notes write themselves: decisions, owners, deadlines.",
+   "caption": "Notes write themselves: decisions, owners, deadlines.",
+   "file": "voice/catchy/notes.wav",
+   "dur": 4.426,
+   "tempo": 1.12,
+   "wpm": 122,
+   "from": 560,
+   "length": 162,
+   "voFrom": 566,
+   "words": [
+    {
+     "w": "Every",
+     "s": 0,
+     "e": 0.4
+    },
+    {
+     "w": "to",
+     "s": 0.4,
+     "e": 0.64
+    },
+    {
+     "w": "do,",
+     "s": 0.64,
+     "e": 1.12
+    },
+    {
+     "w": "the",
+     "s": 1.12,
+     "e": 1.28
+    },
+    {
+     "w": "notes",
+     "s": 1.28,
+     "e": 1.6
+    },
+    {
+     "w": "write",
+     "s": 1.6,
+     "e": 1.84
+    },
+    {
+     "w": "themselves,",
+     "s": 1.84,
+     "e": 2.56
+    },
+    {
+     "w": "decisions,",
+     "s": 2.56,
+     "e": 3.28
+    },
+    {
+     "w": "owners,",
+     "s": 3.28,
+     "e": 3.84
+    },
+    {
+     "w": "deadlines.",
+     "s": 3.84,
+     "e": 4.32
+    }
+   ]
+  },
+  {
+   "id": "templates",
+   "text": "Standup, sales call, lecture: notes shaped to fit.",
+   "caption": "Eight note templates, from standups to lectures.",
+   "file": "voice/catchy/templates.wav",
+   "dur": 3.428,
+   "tempo": 1.12,
+   "wpm": 140,
+   "from": 712,
+   "length": 121,
+   "voFrom": 718,
+   "words": [
+    {
+     "w": "Stand",
+     "s": 0,
+     "e": 0.4
+    },
+    {
+     "w": "up,",
+     "s": 0.4,
+     "e": 0.96
+    },
+    {
+     "w": "sales",
+     "s": 0.96,
+     "e": 1.28
+    },
+    {
+     "w": "call,",
+     "s": 1.28,
+     "e": 1.76
+    },
+    {
+     "w": "lecture,",
+     "s": 1.76,
+     "e": 2.4
+    },
+    {
+     "w": "notes",
+     "s": 2.4,
+     "e": 2.72
+    },
+    {
+     "w": "shaped",
+     "s": 2.72,
+     "e": 3.04
+    },
+    {
+     "w": "to",
+     "s": 3.04,
+     "e": 3.2
+    },
+    {
+     "w": "fit.",
+     "s": 3.2,
+     "e": 3.44
+    }
+   ]
+  },
+  {
+   "id": "memory",
+   "text": "Folders remember your context: briefs, docs, past meetings.",
+   "caption": "Add briefs and docs to a folder. Every meeting there builds on them.",
+   "file": "voice/catchy/memory.wav",
+   "dur": 3.959,
+   "tempo": 1.12,
+   "wpm": 121,
+   "from": 823,
+   "length": 137,
+   "voFrom": 829,
+   "words": [
+    {
+     "w": "Folders",
+     "s": 0,
+     "e": 0.48
+    },
+    {
+     "w": "remember",
+     "s": 0.48,
+     "e": 0.96
+    },
+    {
+     "w": "your",
+     "s": 0.96,
+     "e": 1.2
+    },
+    {
+     "w": "context:",
+     "s": 1.2,
+     "e": 1.92
+    },
+    {
+     "w": "briefs,",
+     "s": 1.92,
+     "e": 2.56
+    },
+    {
+     "w": "docs,",
+     "s": 2.56,
+     "e": 3.12
+    },
+    {
+     "w": "past",
+     "s": 3.12,
+     "e": 3.44
+    },
+    {
+     "w": "meetings.",
+     "s": 3.44,
+     "e": 3.84
+    }
+   ]
+  },
+  {
+   "id": "live",
+   "text": "Every answer. Someone asks mid-call, and the answer pops up, from your own meetings and files.",
+   "caption": "Someone asks mid-call. The answer pops up, from your own meetings and files.",
+   "file": "voice/catchy/live.wav",
+   "dur": 5.284,
+   "tempo": 1.12,
+   "wpm": 182,
+   "from": 950,
+   "length": 180,
+   "voFrom": 956,
+   "words": [
+    {
+     "w": "Every",
+     "s": 0,
+     "e": 0.4
+    },
+    {
+     "w": "answer,",
+     "s": 0.4,
+     "e": 1.12
+    },
+    {
+     "w": "someone",
+     "s": 1.12,
+     "e": 1.44
+    },
+    {
+     "w": "asks",
+     "s": 1.44,
+     "e": 1.76
+    },
+    {
+     "w": "mid",
+     "s": 1.76,
+     "e": 2.16
+    },
+    {
+     "w": "call,",
+     "s": 2.16,
+     "e": 2.56
+    },
+    {
+     "w": "and",
+     "s": 2.56,
+     "e": 2.72
+    },
+    {
+     "w": "the",
+     "s": 2.72,
+     "e": 2.8
+    },
+    {
+     "w": "answer",
+     "s": 2.8,
+     "e": 3.04
+    },
+    {
+     "w": "pops",
+     "s": 3.04,
+     "e": 3.36
+    },
+    {
+     "w": "up",
+     "s": 3.36,
+     "e": 3.6
+    },
+    {
+     "w": "from",
+     "s": 3.6,
+     "e": 3.92
+    },
+    {
+     "w": "your",
+     "s": 3.92,
+     "e": 4.08
+    },
+    {
+     "w": "own",
+     "s": 4.08,
+     "e": 4.32
+    },
+    {
+     "w": "meetings",
+     "s": 4.32,
+     "e": 4.64
+    },
+    {
+     "w": "and",
+     "s": 4.64,
+     "e": 4.8
+    },
+    {
+     "w": "files.",
+     "s": 4.8,
+     "e": 5.2
+    }
+   ]
+  },
+  {
+   "id": "agents",
+   "text": "Plug in Claude, Cursor or Codex. They follow along and answer from your code.",
+   "caption": "Connect Claude, Cursor or Codex. They follow along and answer from your code.",
+   "file": "voice/catchy/agents.wav",
+   "dur": 4.935,
+   "tempo": 1.12,
+   "wpm": 170,
+   "from": 1120,
+   "length": 167,
+   "voFrom": 1126,
+   "words": [
+    {
+     "w": "Plug",
+     "s": 0,
+     "e": 0.32
+    },
+    {
+     "w": "in",
+     "s": 0.32,
+     "e": 0.64
+    },
+    {
+     "w": "Claude,",
+     "s": 0.64,
+     "e": 1.36
+    },
+    {
+     "w": "cursor,",
+     "s": 1.36,
+     "e": 2
+    },
+    {
+     "w": "or",
+     "s": 2,
+     "e": 2.08
+    },
+    {
+     "w": "codex.",
+     "s": 2.08,
+     "e": 2.8
+    },
+    {
+     "w": "They",
+     "s": 2.8,
+     "e": 3.04
+    },
+    {
+     "w": "follow",
+     "s": 3.04,
+     "e": 3.36
+    },
+    {
+     "w": "along",
+     "s": 3.36,
+     "e": 3.6
+    },
+    {
+     "w": "and",
+     "s": 3.6,
+     "e": 3.92
+    },
+    {
+     "w": "answer",
+     "s": 3.92,
+     "e": 4.24
+    },
+    {
+     "w": "from",
+     "s": 4.24,
+     "e": 4.48
+    },
+    {
+     "w": "your",
+     "s": 4.48,
+     "e": 4.64
+    },
+    {
+     "w": "code.",
+     "s": 4.64,
+     "e": 4.96
+    }
+   ]
+  },
+  {
+   "id": "share",
+   "text": "Share just the notes, or export to PDF, Word or Markdown.",
+   "caption": "Share just the notes, or export to PDF, Word or Markdown.",
+   "file": "voice/catchy/share.wav",
+   "dur": 3.921,
+   "tempo": 1.12,
+   "wpm": 168,
+   "from": 1277,
+   "length": 138,
+   "voFrom": 1283,
+   "words": [
+    {
+     "w": "Share",
+     "s": 0,
+     "e": 0.4
+    },
+    {
+     "w": "just",
+     "s": 0.4,
+     "e": 0.72
+    },
+    {
+     "w": "the",
+     "s": 0.72,
+     "e": 0.88
+    },
+    {
+     "w": "notes",
+     "s": 0.88,
+     "e": 1.12
+    },
+    {
+     "w": "or",
+     "s": 1.12,
+     "e": 1.52
+    },
+    {
+     "w": "export",
+     "s": 1.52,
+     "e": 1.92
+    },
+    {
+     "w": "to",
+     "s": 1.92,
+     "e": 2.08
+    },
+    {
+     "w": "PDF,",
+     "s": 2.08,
+     "e": 2.8
+    },
+    {
+     "w": "Word,",
+     "s": 2.8,
+     "e": 3.28
+    },
+    {
+     "w": "or",
+     "s": 3.28,
+     "e": 3.36
+    },
+    {
+     "w": "Markdown.",
+     "s": 3.36,
+     "e": 3.84
+    }
+   ]
+  },
+  {
+   "id": "end",
+   "text": "Catchy. Catch everything. Start free.",
+   "file": "voice/catchy/end.wav",
+   "dur": 3.073,
+   "tempo": 1.12,
+   "wpm": 98,
+   "from": 1405,
+   "length": 165,
+   "voFrom": 1411,
+   "words": [
+    {
+     "w": "Catchy.",
+     "s": 0.08,
+     "e": 0.88
+    },
+    {
+     "w": "Catch",
+     "s": 0.88,
+     "e": 1.2
+    },
+    {
+     "w": "everything.",
+     "s": 1.2,
+     "e": 2
+    },
+    {
+     "w": "Start",
+     "s": 2.08,
+     "e": 2.48
+    },
+    {
+     "w": "free.",
+     "s": 2.48,
+     "e": 3.04
+    }
+   ]
+  }
+ ]
+}

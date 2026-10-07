@@ -21,7 +21,7 @@ The engine is a folder called `motion/`. Its README is the full reference: read 
 - Remote: `git clone https://github.com/philipposk/demo-pipeline` and use its `motion/` folder.
 - Or use a local path the user gives you.
 - Work in a copy or a branch, not in someone else's live render folder.
-- `cd motion && npm install`. Then smoke test: `node scripts/render.mjs acme:light` (about 35 s) and look at `out/sheet-acme-light-nomusic.jpg`.
+- `cd motion && npm install`. Then smoke test: `node scripts/render.mjs acme:light` (about 35 s) and look at `out/sheet-acme-light-nomusic.jpg`. Acme is the smallest example; `src/catchy/` is a full landing video to use as the fuller reference.
 
 ## 2. Study the product (before writing anything)
 

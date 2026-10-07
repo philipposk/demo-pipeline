@@ -1,3 +1,4 @@
 {
+  "Catchy": {"scripts": ["catchy"], "music": "music/pop-track-03.mp3"},
   "Acme": {"scripts": ["acme"], "music": null, "vertical": true}
 }
