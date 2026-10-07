@@ -5,7 +5,7 @@
 A local pipeline that produces a click-through demo video for a web app.
 No SaaS, no manual recording. You give it a config file, it outputs an `.mp4`.
 
-**Location on disk:** `/Users/phktistakis/Devoloper Projects/demo-pipeline/`
+**Location on disk:** the root of this repo (paths below are relative to it).
 
 ## How it works — 4 steps
 
@@ -26,10 +26,10 @@ All must be on PATH / installed once:
 
 ```bash
 # 1. Start the target app (separate terminal)
-cd "/Users/phktistakis/Devoloper Projects/Greenpert" && npm run dev
+cd path/to/greenpert && npm run dev
 
 # 2. Render — default backend is what the project config declares (openai for greenpert)
-cd "/Users/phktistakis/Devoloper Projects/demo-pipeline"
+cd path/to/demo-pipeline
 node pipeline.mjs greenpert
 
 # Override TTS backend
@@ -44,7 +44,7 @@ node pipeline.mjs greenpert --tts=openai --suffix=v2
 
 Output lands in:
 ```
-/Users/phktistakis/Devoloper Projects/demo-pipeline/output/<project>-demo-<suffix>.mp4
+output/<project>-demo-<suffix>.mp4
 ```
 
 ## TTS backends
@@ -60,7 +60,7 @@ Cost guard: pipeline reads `MAX_COST_PER_VIDEO` from `.env` (default `0.20`) and
 
 ## API keys — `.env`
 
-File lives at `/Users/phktistakis/Devoloper Projects/demo-pipeline/.env` (chmod 600, git-ignored).
+File lives at `.env` in the repo root (chmod 600, git-ignored).
 
 Required keys:
 ```
