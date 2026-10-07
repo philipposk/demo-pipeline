@@ -1,0 +1,233 @@
+{
+ "tag": "acme",
+ "script": "acme",
+ "fps": 30,
+ "xf": 10,
+ "voice": "openai:marin",
+ "pace": "normal",
+ "total": 513,
+ "scenes": [
+  {
+   "id": "hook",
+   "text": "Meet Acme Tasks. A to-do list that stays out of your way.",
+   "caption": "",
+   "file": "voice/acme/hook.wav",
+   "dur": 3.966,
+   "tempo": 1.029,
+   "wpm": 182,
+   "from": 0,
+   "length": 137,
+   "voFrom": 6,
+   "words": [
+    {
+     "w": "Meet",
+     "s": 0,
+     "e": 0.46
+    },
+    {
+     "w": "Acme",
+     "s": 0.46,
+     "e": 0.96
+    },
+    {
+     "w": "Tasks",
+     "s": 0.96,
+     "e": 1.48
+    },
+    {
+     "w": "a",
+     "s": 1.86,
+     "e": 2.02
+    },
+    {
+     "w": "to",
+     "s": 2.02,
+     "e": 2.02
+    },
+    {
+     "w": "do",
+     "s": 2.02,
+     "e": 2.2
+    },
+    {
+     "w": "list",
+     "s": 2.2,
+     "e": 2.5
+    },
+    {
+     "w": "that",
+     "s": 2.5,
+     "e": 2.86
+    },
+    {
+     "w": "stays",
+     "s": 2.86,
+     "e": 3.16
+    },
+    {
+     "w": "out",
+     "s": 3.16,
+     "e": 3.42
+    },
+    {
+     "w": "of",
+     "s": 3.42,
+     "e": 3.52
+    },
+    {
+     "w": "your",
+     "s": 3.52,
+     "e": 3.64
+    },
+    {
+     "w": "way",
+     "s": 3.64,
+     "e": 3.86
+    }
+   ]
+  },
+  {
+   "id": "add",
+   "text": "Type a task, press enter, and it lands on your list.",
+   "caption": "Type a task, press enter: it lands on your list.",
+   "file": "voice/acme/add.wav",
+   "dur": 3.41,
+   "tempo": 1,
+   "wpm": 194,
+   "from": 127,
+   "length": 180,
+   "voFrom": 133,
+   "words": [
+    {
+     "w": "Type",
+     "s": 0,
+     "e": 0.26
+    },
+    {
+     "w": "a",
+     "s": 0.26,
+     "e": 0.58
+    },
+    {
+     "w": "task",
+     "s": 0.58,
+     "e": 0.74
+    },
+    {
+     "w": "press",
+     "s": 1.28,
+     "e": 1.36
+    },
+    {
+     "w": "enter",
+     "s": 1.36,
+     "e": 1.68
+    },
+    {
+     "w": "and",
+     "s": 2.18,
+     "e": 2.26
+    },
+    {
+     "w": "it",
+     "s": 2.26,
+     "e": 2.42
+    },
+    {
+     "w": "lands",
+     "s": 2.42,
+     "e": 2.62
+    },
+    {
+     "w": "on",
+     "s": 2.62,
+     "e": 2.84
+    },
+    {
+     "w": "your",
+     "s": 2.84,
+     "e": 3
+    },
+    {
+     "w": "list",
+     "s": 3,
+     "e": 3.24
+    }
+   ]
+  },
+  {
+   "id": "done",
+   "text": "Tick it off when it's done. Acme Tasks. Less clutter, more done.",
+   "caption": "Tick it off when it's done.",
+   "file": "voice/acme/done.wav",
+   "dur": 4.078,
+   "tempo": 1.12,
+   "wpm": 177,
+   "from": 297,
+   "length": 216,
+   "voFrom": 303,
+   "words": [
+    {
+     "w": "Tick",
+     "s": 0,
+     "e": 0.16
+    },
+    {
+     "w": "it",
+     "s": 0.16,
+     "e": 0.28
+    },
+    {
+     "w": "off",
+     "s": 0.28,
+     "e": 0.54
+    },
+    {
+     "w": "when",
+     "s": 0.54,
+     "e": 0.76
+    },
+    {
+     "w": "it's",
+     "s": 0.76,
+     "e": 1.12
+    },
+    {
+     "w": "done",
+     "s": 1.12,
+     "e": 1.44
+    },
+    {
+     "w": "Acme",
+     "s": 1.78,
+     "e": 1.9
+    },
+    {
+     "w": "Tasks",
+     "s": 1.9,
+     "e": 2.36
+    },
+    {
+     "w": "less",
+     "s": 2.84,
+     "e": 2.9
+    },
+    {
+     "w": "clutter",
+     "s": 2.9,
+     "e": 3.18
+    },
+    {
+     "w": "more",
+     "s": 3.62,
+     "e": 3.74
+    },
+    {
+     "w": "done",
+     "s": 3.74,
+     "e": 3.94
+    }
+   ]
+  }
+ ]
+}

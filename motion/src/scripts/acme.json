@@ -1,0 +1,8 @@
+[
+  {"id": "hook", "text": "Meet Acme Tasks. A to-do list that stays out of your way.", "minSec": 4.4,
+    "caption": ""},
+  {"id": "add", "text": "Type a task, press enter, and it lands on your list.", "minSec": 6,
+    "caption": "Type a task, press enter: it lands on your list."},
+  {"id": "done", "text": "Tick it off when it's done. Acme Tasks. Less clutter, more done.", "minSec": 6, "holdSec": 1.2,
+    "caption": "Tick it off when it's done."}
+]

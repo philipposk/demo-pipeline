@@ -137,6 +137,12 @@ lib/cost.mjs      assertWithinBudget(backend, model, chars, capUSD)
 
 See `AGENTS.md` for full agent/LLM usage guide.
 
+## Motion videos (built as code, no screen recording)
+
+`motion/` is a second, separate way to make product videos: the product's screens are rebuilt as React components with [Remotion](https://www.remotion.dev), narration comes from TTS with word timings, and every animation lands on the spoken word. One set of scenes renders as light, dark, silent-captioned and vertical (9:16) cuts. Start with [`motion/README.md`](motion/README.md); a small fictional example product ("Acme Tasks") is included.
+
+**Claude skill:** [`skills/product-video`](skills/product-video/SKILL.md) teaches Claude Code the whole workflow. Install it with `cp -r skills/product-video ~/.claude/skills/` and ask for "a product video for <your app>".
+
 ## License
 
 MIT

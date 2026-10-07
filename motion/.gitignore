@@ -1,0 +1,14 @@
+node_modules
+out/
+.env
+.env.*
+!.env.example
+.DS_Store
+public/voice/*.raw.wav
+public/voice/*.trim.wav
+public/voice/**/*.trim.wav
+public/voice/_raw/
+public/music/*
+!public/music/.gitkeep
+!public/music/SOURCES.txt
+public/capture/
