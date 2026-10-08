@@ -124,6 +124,8 @@ node inspect.mjs
 | `lib/record.mjs` | `record(cfg)` — launches Playwright, steps through scenes, returns `.webm` path. |
 | `lib/merge.mjs` | `buildNarrationTrack(scenes, outWav, workDir)` + `muxToMp4(cfg)` |
 | `lib/cost.mjs` | `assertWithinBudget(backend, model, chars, capUSD)` — throws if over budget. |
+| `lib/capture.mjs` | Studio mode. `capture(cfg)` — same scene loop as `record()`, but reads Chrome's screencast at viewport × DPR (sharp) and logs clicks (with element + context box + label), typing, scrolls, navigations. |
+| `lib/studio.mjs` | Studio mode. `buildPlan()` turns capture + narration into pure timing data (segments, camera keys, cursor clicks, caption words, sounds); `renderStudio()` copies assets to `motion/public/studio/<slug>/` and runs `npx remotion render … Studio`. Drawing lives in `motion/src/studio/Studio.tsx`. |
 
 ## Known issues / gotchas
 

@@ -194,6 +194,10 @@ Captions show the script's spelling at the speech-to-text timings (`alignWords`)
 `:silent` hides the voice and shows each line's `caption` as a pill (`src/caption.tsx`). Use it for autoplay and social.
 
 ### 4.7 Real-app footage (optional)
+The pipeline's `--mode=studio` (repo root) is the automatic version of this: it captures any configured project or URL,
+then renders the `Studio` composition (`src/studio/Studio.tsx`) with props written by `lib/studio.mjs`. Per-render files
+go to `public/studio/<slug>/` (gitignored).
+
 `capture/record.mjs` records a live web app through Chrome's screencast at full device resolution and logs every step, click and focus box; `src/footage.tsx` plays that inside a scene. Needs `npm i -D playwright`. Output goes to `public/capture/` and `src/captures/` (the first is gitignored).
 
 ## 5. Voice: `scripts/voice.mjs`

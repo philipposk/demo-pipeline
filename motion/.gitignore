@@ -12,3 +12,6 @@ public/music/*
 !public/music/.gitkeep
 !public/music/SOURCES.txt
 public/capture/
+
+# studio mode: per-render captures, voices and props written by lib/studio.mjs
+public/studio/
