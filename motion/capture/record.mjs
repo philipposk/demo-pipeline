@@ -163,22 +163,30 @@ export async function record({url, out, steps, viewport = {width: 1440, height: 
   if (!frames.length) throw new Error('no frames captured');
 
   // --- frames -> constant-rate mp4 (each frame held until the next one) -----------------------------------------------
+  // The first frame Chrome sends is the last one it painted, which on a still page can be seconds older than t0. Count
+  // every frame from t0 at the earliest (and keep only the newest of those before t0), so the video's time 0 is t0,
+  // its length is the take's length, and the logged events line up with the picture.
+  const at = (fr) => Math.max(fr.t, t0);
+  const used = frames.slice(Math.max(0, frames.findLastIndex((fr) => fr.t <= t0)));
   const list = [];
-  frames.forEach((fr, i) => {
-    const next = i + 1 < frames.length ? frames[i + 1].t : t0 + end;
-    list.push(`file '${fr.file}'`, `duration ${Math.max(0.001, next - fr.t).toFixed(4)}`);
+  used.forEach((fr, i) => {
+    const next = i + 1 < used.length ? at(used[i + 1]) : t0 + end;
+    list.push(`file '${fr.file}'`, `duration ${Math.max(0.001, next - at(fr)).toFixed(4)}`);
   });
-  list.push(`file '${frames.at(-1).file}'`);
+  // concat applies the last duration only when the last file is listed again; that repeat can add its own length, so
+  // the output is cut to the take's length (-t below).
+  list.push(`file '${used.at(-1).file}'`);
   writeFileSync(join(tmp, 'frames.txt'), list.join('\n'));
   mkdirSync(join(ROOT, 'public/capture'), {recursive: true});
-  const lead = Math.max(0, frames[0].t - t0); // frames start slightly after t0: pad with the first frame
+  const lead = Math.max(0, used[0].t - t0); // frames start slightly after t0: pad with the first frame
   const shrink = Math.min(1, Math.sqrt(8.5e6 / (size.w * size.h)));
   const enc = {w: 2 * Math.round((size.w * shrink) / 2), h: 2 * Math.round((size.h * shrink) / 2)};
   execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', join(tmp, 'frames.txt'),
     // Remotion's decoder shows only keyframes of frames above H.264 level 5.1 (about 8.9 Mpx), so bigger captures are
     // scaled down; short GOPs without B-frames keep frozen-frame seeks exact.
     '-vf', `tpad=start_duration=${lead.toFixed(3)}:start_mode=clone,fps=${fps},scale=${enc.w}:${enc.h}:flags=lanczos`,
-    '-c:v', 'libx264', '-preset', 'medium', '-crf', '14', '-g', '15', '-bf', '0', '-pix_fmt', 'yuv420p', join(ROOT, 'public/capture', `${out}.mp4`)]);
+    '-c:v', 'libx264', '-preset', 'medium', '-crf', '14', '-g', '15', '-bf', '0', '-pix_fmt', 'yuv420p', '-t', end.toFixed(3),
+    join(ROOT, 'public/capture', `${out}.mp4`)]);
   const data = {name: out, w: size.w, h: size.h, css: viewport, dpr, fps, duration: end, failed, steps: stepLog, events};
   mkdirSync(join(ROOT, 'src/captures'), {recursive: true});
   writeFileSync(join(ROOT, 'src/captures', `${out}.json`), JSON.stringify(data, null, 1));
