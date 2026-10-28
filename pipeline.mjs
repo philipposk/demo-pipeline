@@ -164,6 +164,8 @@ if (mode === 'studio') {
     padSec: 0.6,
     storageState: cfg.storageState,
     hideSelectors: cfg.hideSelectors,
+    // studio.serveAs: {"origin": "https://app.example.com", "app": "http://localhost:3000"}: url on origin, answered locally
+    serveAs: cfg.studio?.serveAs,
   });
   const outDir = path.join(__dirname, 'output');
   mkdirSync(outDir, { recursive: true });
@@ -192,6 +194,7 @@ if (mode === 'studio') {
       introSec: cfg.intro?.dur ? Math.min(cfg.intro.dur, 2.8) : undefined,
       outroSec: cfg.outro?.dur ? Math.min(cfg.outro.dur, 3.2) : undefined,
       concurrency: flagMap.concurrency,
+      loudnorm: flagMap.loudnorm ?? cfg.studio?.loudnorm,
     },
   });
   console.log(`\nDone. → ${outMp4}`);

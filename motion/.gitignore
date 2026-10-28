@@ -15,3 +15,4 @@ public/capture/
 
 # studio mode: per-render captures, voices and props written by lib/studio.mjs
 public/studio/
+capture/screen-take/take.log

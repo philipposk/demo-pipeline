@@ -19,6 +19,38 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 
+/**
+ * Load the app under its real address while every request is answered by a local server, so links and addresses on
+ * screen read like the real site and nothing reaches it. Call it in `init(ctx)`, then record `${origin}/...`.
+ *   await serveAs(ctx, {origin: 'https://app.example.com', app: 'http://localhost:3000'});
+ * The dev server's websocket (hot reload; Next.js does not hydrate without it) is proxied too; that part needs Node 22+.
+ */
+export async function serveAs(ctx, {origin, app}) {
+  const host = new URL(origin).host;
+  const local = new URL(app);
+  await ctx.route((u) => u.host === host, async (route) => {
+    const u = new URL(route.request().url());
+    const r = await route.fetch({url: local.origin + u.pathname + u.search}).catch(() => null);
+    if (r) await route.fulfill({response: r});
+    else await route.abort().catch(() => {});
+  });
+  if (typeof WebSocket === 'undefined') {
+    console.warn('serveAs: this Node has no WebSocket, so the dev server\'s socket is not proxied (use Node 22+ if the page does not load)');
+    return;
+  }
+  await ctx.routeWebSocket((u) => u.host === host, (ws) => {
+    const u = new URL(ws.url());
+    const up = new WebSocket(local.origin.replace(/^http/, 'ws') + u.pathname + u.search);
+    up.binaryType = 'arraybuffer';
+    const queue = [];
+    up.onopen = () => { for (const m of queue.splice(0)) up.send(m); };
+    up.onmessage = (e) => ws.send(typeof e.data === 'string' ? e.data : Buffer.from(e.data));
+    up.onclose = () => ws.close();
+    ws.onMessage((m) => (up.readyState === 1 ? up.send(m) : queue.push(m)));
+    ws.onClose(() => up.close());
+  });
+}
+
 export async function record({url, out, steps, viewport = {width: 1440, height: 900}, dpr = 2, phone = false, init, ready, fps = 30, context = {}}) {
   const tmp = join(ROOT, 'out', '.capture', out);
   rmSync(tmp, {recursive: true, force: true});
