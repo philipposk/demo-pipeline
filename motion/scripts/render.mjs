@@ -5,6 +5,7 @@
 //            and if that is null (or the file is missing) the video has no music.
 //   :silent  no voice; each line's "caption" is shown as a title instead
 //   STRICT_MOTION=1 makes the freeze check (below) exit with an error instead of a warning
+//   CONCURRENCY=<n> and OTV_CACHE=<bytes> are passed to Remotion (CONCURRENCY=1 OTV_CACHE=400000000 when memory is short)
 //   :vertical renders the 1080x1920 phone cut (products with "vertical": true in src/products.json)
 // The product (composition id prefix and file name) comes from the timeline's "script" via src/products.json.
 import {existsSync, readFileSync} from 'node:fs';
@@ -76,7 +77,10 @@ for (const spec of specs) {
   const name = `${tag.startsWith(base) ? tag : `${base}-${tag}`}-${theme}-${m}${voiceover ? '' : '-silent'}${vertical ? '-vertical' : ''}`;
   const t0 = Date.now();
   execFileSync('npx', ['remotion', 'render', 'src/index.ts', `${product}-${tag}${vertical ? '-vertical' : ''}`, `out/${name}.mp4`,
-    `--props=${JSON.stringify({tag, theme, music, voiceover, format: vertical ? 'vertical' : 'landscape'})}`, '--log=error'],
+    `--props=${JSON.stringify({tag, theme, music, voiceover, format: vertical ? 'vertical' : 'landscape'})}`, '--log=error',
+    // For a machine short of memory or disk (long real-app captures): CONCURRENCY=1 OTV_CACHE=400000000
+    ...(process.env.CONCURRENCY ? [`--concurrency=${process.env.CONCURRENCY}`] : []),
+    ...(process.env.OTV_CACHE ? [`--offthreadvideo-cache-size-in-bytes=${process.env.OTV_CACHE}`] : [])],
     {stdio: 'inherit', cwd: ROOT});
   console.log(`${name}.mp4 rendered in ${Math.round((Date.now() - t0) / 1000)} s`);
   const frozen = frozenRanges(join(ROOT, 'out', `${name}.mp4`));

@@ -198,7 +198,42 @@ The pipeline's `--mode=studio` (repo root) is the automatic version of this: it 
 then renders the `Studio` composition (`src/studio/Studio.tsx`) with props written by `lib/studio.mjs`. Per-render files
 go to `public/studio/<slug>/` (gitignored).
 
-`capture/record.mjs` records a live web app through Chrome's screencast at full device resolution and logs every step, click and focus box; `src/footage.tsx` plays that inside a scene. Needs `npm i -D playwright`. Output goes to `public/capture/` and `src/captures/` (the first is gitignored).
+`capture/record.mjs` records a web app through Chrome's screencast at full device resolution and logs every step, click
+and focus box; `src/footage.tsx` plays that inside a scene. Needs Playwright (`npm i -D playwright`, or the app's own when
+`motion/` sits inside the app). Output goes to `public/capture/` and `src/captures/` (the first is gitignored).
+
+Use it when the video must show the real app, not a rebuilt one. What keeps it fast: **the app is never signed in and
+never waits on a server.** The app gets dev-only harness pages that render its real components with made-up data and
+scripted events, served by its dev server; the capture drives those pages, and nothing touches a database or an AI service.
+
+1. **Harness pages in the app** (dev only, a 404 in production): the real page's components, a fixture with the story's
+   data, a fetch stub that answers every API call the page makes, and a timeline of scripted events (a line arriving, a
+   status changing). Mark the DOM nodes the capture needs (`data-*` attributes) instead of relying on text.
+2. **Capture script** `capture/<product>-<id>.mjs`: one `record()` call per take (laptop, phone, light and dark). A take
+   is a list of steps `{id, run: async (h) => {...}}` whose ids match the script's line ids. Helpers: `h.click`, `h.type`,
+   `h.press`, `h.move`, `h.scroll`, `h.focus(target, {zoom})` (a camera and ring cue), `h.unfocus`, `h.waiting(fn)` (a wait
+   the composition speeds up), `h.pause(ms)`, `h.log({type: 'mark', name, box})` (a box the composition reads, e.g. a
+   sentence to highlight). `init(ctx)` sets cookies, `localStorage` and `ctx.clock` before the page loads; `context`
+   passes extra context options such as `{timezoneId, locale}`. Output: `public/capture/<out>.mp4` plus
+   `src/captures/<out>.json` (steps, events, CSS size, dpr). A failed step stops the take and leaves a screenshot in
+   `out/.capture/<out>/`.
+   - Record at dpr 2-3 so text stays sharp at 2x zoom. `record()` scales a capture above about 8.9 Mpx down, because
+     Remotion's decoder shows only the keyframes of bigger video (above H.264 level 5.1), and encodes GOP 15 without
+     B-frames so frozen-frame seeks are exact.
+   - Check the app's layout breakpoints before picking a viewport, so the take shows the layout you want.
+   - `CHROME_PATH` points at a Chromium build when Playwright's own browser is not downloaded.
+3. **Composition:** each scene plays one step with `<Footage cap={...} step="..." width height ringColor />`. Its props:
+   - `camera`: shots `{f, box, zoom, ring}` set by the scene, instead of the capture's focus events.
+   - `followY` (phones): the page's full width fills the screen and the camera pans up and down to each focus.
+   - `from` (seconds into the step), `speed` (faster than real time), `lead` (frames before the step starts).
+   - `overlay(t)`: marks drawn in the app's CSS-pixel space at source time `t`, e.g. a highlighter over a sentence.
+   - `tap`: a finger tap instead of the arrow cursor.
+   Logged waits play compressed to about 0.8 s, and the step's last frame holds.
+4. **Themes:** record every take in both themes; the Demo swaps captures and its own palette with an `apply<Product>(theme)`.
+5. **Variants** are extra scripts on the same Demo: list them in `products.json` and map extra line ids in `SCENES`.
+6. **Sync with recorded sound** (a voice clip, a call): the page shows reactions 0.7-1.1 s after the sound, per take.
+   Measure the offset on stills and keep it per capture name.
+7. **QA:** stills of every scene and every sync frame (spoken word vs. the word on screen), then render one variant at a time.
 
 ## 5. Voice: `scripts/voice.mjs`
 
@@ -207,14 +242,34 @@ node scripts/voice.mjs --script=<id>                       # normal pace, voice 
 PACE=fast node scripts/voice.mjs --script=<id> --tag=<id>fast
 VOICE=cedar node scripts/voice.mjs --script=<id> --tag=<id>cedar
 node scripts/voice.mjs --script=<id> --retime              # re-fetch word timings only
+node scripts/voice.mjs --script=<id> --takes=4 --lines=reveal,end   # audition: 4 fresh takes of these lines, no timeline
 ```
 
 **Pipeline, per line**
 1. TTS, cached by provider, voice and text (`public/voice/_raw/`).
-2. Trim the silence at both ends, and cap internal pauses at 0.2 s (at -40 dB).
+2. Trim the silence at both ends, and cap internal pauses at 0.2 s (`PAUSE_CAP`, at -45 dB).
 3. Gently speed up to about 182 wpm, at most x1.12. The fast pace targets 200 wpm, at most x1.2.
 4. Get word timings and build the timeline: `scene length = max(lead + voice + tail, minSec) + holdSec`. Scenes overlap by `xf` frames, which gives the dissolve (normal: lead 6, tail 12, xf 10; fast: 4, 6, 8).
 5. Write `out/<tag>.vtt` and regenerate `src/timelines/index.ts`.
+
+**Per-line fields** besides `text`, `caption`, `minSec`, `holdSec` and `speed`:
+- `say`: what the voice reads when it differs from the caption (a brand name spelled the way the voice says it right).
+- `style`: a style prompt for this line only (a firmer start, a calmer line). It is part of the cache key.
+- `pauseCap`: this line's pause cap in seconds.
+- `leadIn`: seconds of silence kept before the first word (default 0.03), so a soft first sound is not cut.
+- `take`: which audition take to use (below).
+
+**Pick takes by ear.** TTS mispronounces a word now and then, and the speech recogniser does not notice: it can report a
+garbled word as the right one with full confidence. For any line that matters, run `--takes=N --lines=<ids>`: it saves N
+fresh takes as `out/takes/<script>/<id>-t<k>.mp3` and in the raw cache. Have someone who speaks the language listen (for a
+short line, with the sound before it mixed in), then set `"take": k` on the line in every script that has it and re-run.
+A take liked except for one long pause can be cut by hand (ffmpeg `atrim` plus a 10 ms `acrossfade`) and saved as the
+next take file next to the original (`public/voice/_raw/<voice>/<id>-<hash>.t<k>.wav`). Re-voicing often loses the
+delivery that made the take good, and splicing one word in from another line sounds like an echo.
+
+**Other languages:** `STT_LANG=<code>` (e.g. `el`) for word timings, a `VOICE_STYLE` written in that language, and `WPM`
+low enough that no line is sped up (Greek: 100). Speeding Greek up even 1.2x warped words. A custom `VOICE_STYLE` is
+part of the cache key.
 
 **Keys** are read from the environment, then `.env`, then the file named by `ENV_FILE` (optional).
 
@@ -223,11 +278,11 @@ node scripts/voice.mjs --script=<id> --retime              # re-fetch word timin
 | Provider | Notes |
 |---|---|
 | `openai` (default) | `gpt-4o-mini-tts`, style set through `instructions`, so it never reads the style aloud. Voices: marin, cedar, coral and more. Disclose "AI voice" wherever the video is published. |
-| `gemini` | Style must go in `systemInstruction`, otherwise it reads the style text aloud. The free tier stops after about 10 requests a day, so it needs billing. |
+| `gemini` | Style must go in `systemInstruction`, otherwise it reads the style text aloud. Gemini 2.5 TTS models (`GEMINI_TTS_MODEL=gemini-2.5-flash-preview-tts`) take no system instruction, so `voice.mjs` puts the style in front of the text: write it in the script's language. The free tier stops after 10 requests a day per model, so it needs billing on its Google project; a 429 that names `FreeTier` means the key's project has no billing yet. |
 | `deepgram` | Aura-2 voices with no style control. Fine, but flatter. |
 | Avoid | ElevenLabs free tier (no commercial use) and edge-tts (unclear commercial licence). |
 
-**Word timings:** Deepgram nova-3 when `DEEPGRAM_API_KEY` exists, because its timings are tighter than Whisper's (Whisper sometimes puts two words 0.02 s apart). Without it the OpenAI key is used for Whisper.
+**Word timings:** Deepgram nova-3 when `DEEPGRAM_API_KEY` exists, because its timings are tighter than Whisper's (Whisper sometimes puts two words 0.02 s apart). Without it the OpenAI key is used for Whisper. Each line gets 0.3 s of silence in front before it is sent, so the recogniser does not miss the first word.
 
 ## 6. Render, QA, variants
 
@@ -283,7 +338,16 @@ cp out/<tag>.vtt out/site/demo.vtt
 
 ## 10. Pitfalls
 
-- **Don't screen-record the live app** for marketing video unless you must: sign-in automation, waits on real processing and timing overruns cost days.
+- **Don't screen-record the live app** for marketing video unless you must: sign-in automation, waits on real processing and timing overruns cost days. When the real UI must be shown, record dev harness pages with made-up data instead (4.7).
+- **Real-app footage:**
+  - `<Freeze>` clamps its frame to the composition length, so a long capture showed earlier frames. `Footage` plays a
+    held frame through a `<Sequence>` with a negative offset instead.
+  - Remotion shows only the keyframes of video above about 8.9 Mpx; `record()` scales down (4.7).
+  - Caption word matching (`norm` in `src/vertical.tsx` and `src/lib.tsx`) keeps letters in any alphabet (`\p{L}`);
+    with `[a-z]` only, every Greek word matched the empty string.
+- **Memory and disk on long captures:** "Could not extract frame from compositor … disk space is low" means the machine
+  ran out of memory or disk, not a code bug. Render one at a time with `CONCURRENCY=1 OTV_CACHE=400000000`, check free
+  disk first, and delete `$TMPDIR/remotion-webpack-bundle-*` (about 250 MB each) after every render.
 - **Shell and tooling:** zsh does not split `$var` in `for` loops (use node runners or arrays); BSD `sed` has no `\b`; Node ESM resolves packages relative to the script file's folder.
 - **Remotion:**
   - The audio component is `Html5Audio`.
