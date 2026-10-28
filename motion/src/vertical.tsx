@@ -42,7 +42,8 @@ export const Reframe: React.FC<{sc: SceneData; keys?: FocusKey[]; cy: number; ch
   );
 };
 
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9æøå]/g, '');
+// Letters and digits in any script (Greek too), accents dropped.
+const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]/gu, '');
 
 // Speech-to-text words (exact timings, but its own spelling: "acme", "AcmeTasks.") aligned to the script's words,
 // so captions show the script's spelling at the spoken time.

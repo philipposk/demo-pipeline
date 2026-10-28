@@ -21,7 +21,8 @@ export const useSpring = () => {
   return (at: number, config = SPRING) => spring({frame: f - at, fps, config});
 };
 
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+// Letters and digits in any script (Greek too), accents dropped.
+const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]/gu, '');
 
 // Scene-local frame at which a narration word starts, so motion lands on the spoken word.
 export const useTiming = (sc: SceneData) => {

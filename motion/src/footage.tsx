@@ -1,5 +1,5 @@
 import React from 'react';
-import {Freeze, OffthreadVideo, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
+import {OffthreadVideo, Sequence, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {CL} from './lib';
 
 // Real-app footage from capture/record.mjs, played inside a scene: the step's stretch of the recording (waits sped
@@ -65,19 +65,32 @@ const cursorAt = (evs: CapEvent[], t: number) => {
 
 // A camera target: the region of the app (CSS px) to show, as centre + zoom.
 type View = {cx: number; cy: number; z: number};
+// `camera`: shots set by the composition instead of the capture's focus events. `f`: scene frame; `box: null` = whole page.
+// `ringBox`: ring this instead of `box`; `keepRing`: leave the current ring up; `still`: change the ring only, not the camera.
+export type Shot = {f: number; box: Box | null; zoom?: number; ring?: boolean; ringBox?: Box; keepRing?: boolean; still?: boolean};
 
+// `from`: start this many seconds into the step (scene time of its clock); `speed`: play faster than real time.
+// `tap`: draw a finger tap (phones) instead of the arrow. `overlay(t)`: extra marks in the app's CSS-pixel space at
+// source time t (a highlighter over a sentence, say), drawn under the cursor.
 export const Footage: React.FC<{
   cap: Capture; step: string; width: number; height: number; fit?: 'contain' | 'follow'; baseZoom?: number; ringColor: string; radius?: number;
-  lead?: number;
-}> = ({cap, step, width, height, fit = 'contain', baseZoom = 1, ringColor, radius = 18, lead = 0}) => {
+  lead?: number; from?: number; speed?: number; tap?: boolean; overlay?: (t: number) => React.ReactNode;
+  camera?: Shot[]; followY?: boolean; startY?: number;
+}> = ({cap, step, width, height, fit = 'contain', baseZoom = 1, ringColor, radius = 18, lead = 0, from = 0, speed = 1, tap = false, overlay, camera,
+  followY = false, startY}) => {
   const f = useCurrentFrame();
   const {fps} = useVideoConfig();
   const clock = React.useMemo(() => stepClock(cap, step), [cap, step]);
-  const s = Math.max(0, (f - lead) / fps);
+  const s = from + Math.max(0, (f - lead) / fps) * speed;
   const t = clock.src(s);
+  // scene frame of a source time, through the offset and speed
+  const frameOf = (src: number) => ((clock.scene(src) - from) / speed) * fps + lead;
   const {css} = cap;
   const k = Math.min(width / css.width, height / css.height); // CSS px -> window px at zoom 1
-  const full: View = {cx: css.width / 2, cy: css.height / 2, z: fit === 'contain' ? 1 : baseZoom};
+  // followY (phones): the page's full width fills the window, and the camera pans up and down to each focus, click or
+  // typing spot. startY: where it looks before the first of them.
+  const fillZ = Math.max(1, width / (k * css.width));
+  const full: View = followY ? {cx: css.width / 2, cy: startY ?? css.height / 2, z: fillZ} : {cx: css.width / 2, cy: css.height / 2, z: fit === 'contain' ? 1 : baseZoom};
   const zoomFor = (b: Box, want: number) =>
     Math.max(1, Math.min(want, width / (k * b.width * 1.08), height / (k * b.height * 1.08)));
   const clampView = (v: View): View => {
@@ -95,12 +108,31 @@ export const Footage: React.FC<{
     if (c) view = {cx: c.x, cy: c.y, z: baseZoom};
   }
   let ring: {box: Box; o: number} | null = null;
-  for (const e of focuses) {
-    const at = (clock.scene(e.t) * fps) + lead;
-    const p = spring({frame: f - at, fps, config: CAM});
-    const target: View = e.box ? {cx: e.box.x + e.box.width / 2, cy: e.box.y + e.box.height / 2, z: zoomFor(e.box, (e.zoom ?? 1.6) * (fit === 'follow' ? 1 : 1))} : full;
-    view = {cx: view.cx + (target.cx - view.cx) * p, cy: view.cy + (target.cy - view.cy) * p, z: view.z + (target.z - view.z) * p};
-    if (f >= at) ring = e.box && e.ring !== false ? {box: e.box, o: interpolate(f - at, [6, 14], [0, 1], CL)} : null;
+  const followShots = (): Shot[] => {
+    const out: Shot[] = [];
+    for (const e of clock.evs) {
+      const f0 = frameOf(e.t);
+      if (e.type === 'focus' && !e.box) out.push({f: f0, box: null, still: true, ring: false});
+      const y = e.type === 'focus' ? (e.box ? e.box.y + e.box.height / 2 : null) : e.type === 'click' ? e.y ?? null : null;
+      if (y == null) continue;
+      out.push({f: f0, box: {x: 0, y: y - 1, width: css.width / 1.08, height: 2}, zoom: 99,
+        ring: e.type === 'focus' && e.ring !== false, ringBox: e.type === 'focus' ? e.box ?? undefined : undefined, keepRing: e.type === 'click'});
+    }
+    return out;
+  };
+  const shots: Shot[] = camera ?? (followY ? followShots() : focuses.map((e) => ({f: frameOf(e.t), box: e.box ?? null, zoom: e.zoom, ring: e.ring})));
+  for (const e of shots) {
+    const at = e.f;
+    if (!e.still) {
+      const p = spring({frame: f - at, fps, config: CAM});
+      const target: View = e.box ? {cx: e.box.x + e.box.width / 2, cy: e.box.y + e.box.height / 2, z: zoomFor(e.box, e.zoom ?? 1.6)} : full;
+      view = {cx: view.cx + (target.cx - view.cx) * p, cy: view.cy + (target.cy - view.cy) * p, z: view.z + (target.z - view.z) * p};
+    }
+    if (f >= at) {
+      const rb = e.ringBox ?? e.box;
+      if (e.ring !== false && rb) ring = {box: rb, o: interpolate(f - at, [6, 14], [0, 1], CL)};
+      else if (!e.keepRing) ring = null;
+    }
   }
   view = clampView(view);
   const z = view.z;
@@ -109,20 +141,34 @@ export const Footage: React.FC<{
   const cur = cursorAt(clock.evs.length ? cap.events : [], t);
   const clicks = clock.evs.filter((e) => e.type === 'click');
   const lastClick = clicks.filter((c) => c.t <= t).at(-1);
-  const since = lastClick ? (clock.scene(t) - clock.scene(lastClick.t)) * fps : 999;
+  const since = lastClick ? f - frameOf(lastClick.t) : 999;
   const px = 1 / (k * z); // one screen pixel in CSS px
   return (
     <div style={{position: 'relative', width, height, overflow: 'hidden', borderRadius: radius}}>
       <div style={{position: 'absolute', left: 0, top: 0, width: css.width, height: css.height, transformOrigin: '0 0',
         transform: `translate(${tx}px, ${ty}px) scale(${k * z})`}}>
-        <Freeze frame={Math.min(Math.round(t * cap.fps), Math.floor(cap.duration * cap.fps) - 1)}>
+        {/* A sequence shifted so the video sits on source frame n now. Not <Freeze>: it clamps the frame it sets to the
+            composition's length, so a long capture in a short video showed earlier frames. */}
+        <Sequence from={f - Math.min(Math.round(t * cap.fps), Math.floor(cap.duration * cap.fps) - 1)} layout="none">
           <OffthreadVideo src={staticFile(`capture/${cap.name}.mp4`)} muted style={{width: css.width, height: css.height, display: 'block'}} />
-        </Freeze>
+        </Sequence>
         {ring && (
           <div style={{position: 'absolute', left: ring.box.x, top: ring.box.y, width: ring.box.width, height: ring.box.height, borderRadius: 10 * px * 2,
             border: `${3 * px}px solid ${ringColor}`, boxShadow: `0 0 0 ${6 * px}px ${ringColor}33`, opacity: ring.o}} />
         )}
-        {cur && (
+        {overlay?.(t)}
+        {cur && tap && (
+          <div style={{position: 'absolute', left: cur.x, top: cur.y}}>
+            <div style={{position: 'absolute', left: -22 * px, top: -22 * px, width: 44 * px, height: 44 * px, borderRadius: '50%',
+              background: 'rgba(20,20,20,0.18)', border: `${2 * px}px solid rgba(255,255,255,0.9)`, boxShadow: '0 2px 10px rgba(0,0,0,0.25)',
+              transform: `scale(${since < 10 ? interpolate(since, [0, 3, 10], [1, 0.8, 1], CL) : 1})`}} />
+            {since < 16 && (
+              <div style={{position: 'absolute', left: -since * 3.2 * px, top: -since * 3.2 * px, width: since * 6.4 * px, height: since * 6.4 * px,
+                borderRadius: '50%', border: `${3 * px}px solid ${ringColor}`, opacity: interpolate(since, [0, 16], [0.7, 0], CL)}} />
+            )}
+          </div>
+        )}
+        {cur && !tap && (
           <div style={{position: 'absolute', left: cur.x, top: cur.y}}>
             {since < 16 && (
               <div style={{position: 'absolute', left: -since * 2.4 * px * 3, top: -since * 2.4 * px * 3, width: since * 4.8 * px * 3, height: since * 4.8 * px * 3,

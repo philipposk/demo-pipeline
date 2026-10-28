@@ -19,14 +19,16 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 
-export async function record({url, out, steps, viewport = {width: 1440, height: 900}, dpr = 2, phone = false, init, ready, fps = 30}) {
+export async function record({url, out, steps, viewport = {width: 1440, height: 900}, dpr = 2, phone = false, init, ready, fps = 30, context = {}}) {
   const tmp = join(ROOT, 'out', '.capture', out);
   rmSync(tmp, {recursive: true, force: true});
   mkdirSync(tmp, {recursive: true});
-  const browser = await chromium.launch({args: [`--force-device-scale-factor=${dpr}`]});
+  // CHROME_PATH: a Chromium build when the installed Playwright's own browser is not downloaded.
+  const browser = await chromium.launch({args: [`--force-device-scale-factor=${dpr}`, '--autoplay-policy=no-user-gesture-required'], executablePath: process.env.CHROME_PATH || undefined});
+  // `context`: extra context options, e.g. {timezoneId: 'Europe/Athens'} so clock times read like the story's place.
   const ctx = await browser.newContext(phone
-    ? {...devices['iPhone 13'], viewport, deviceScaleFactor: dpr}
-    : {viewport, deviceScaleFactor: dpr});
+    ? {...devices['iPhone 13'], viewport, deviceScaleFactor: dpr, ...context}
+    : {viewport, deviceScaleFactor: dpr, ...context});
   if (init) await init(ctx);
   const page = await ctx.newPage();
   await page.goto(url, {waitUntil: 'domcontentloaded'});
@@ -170,9 +172,13 @@ export async function record({url, out, steps, viewport = {width: 1440, height: 
   writeFileSync(join(tmp, 'frames.txt'), list.join('\n'));
   mkdirSync(join(ROOT, 'public/capture'), {recursive: true});
   const lead = Math.max(0, frames[0].t - t0); // frames start slightly after t0: pad with the first frame
+  const shrink = Math.min(1, Math.sqrt(8.5e6 / (size.w * size.h)));
+  const enc = {w: 2 * Math.round((size.w * shrink) / 2), h: 2 * Math.round((size.h * shrink) / 2)};
   execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', join(tmp, 'frames.txt'),
-    '-vf', `tpad=start_duration=${lead.toFixed(3)}:start_mode=clone,fps=${fps},scale=${size.w}:${size.h}`,
-    '-c:v', 'libx264', '-preset', 'fast', '-crf', '14', '-pix_fmt', 'yuv420p', join(ROOT, 'public/capture', `${out}.mp4`)]);
+    // Remotion's decoder shows only keyframes of frames above H.264 level 5.1 (about 8.9 Mpx), so bigger captures are
+    // scaled down; short GOPs without B-frames keep frozen-frame seeks exact.
+    '-vf', `tpad=start_duration=${lead.toFixed(3)}:start_mode=clone,fps=${fps},scale=${enc.w}:${enc.h}:flags=lanczos`,
+    '-c:v', 'libx264', '-preset', 'medium', '-crf', '14', '-g', '15', '-bf', '0', '-pix_fmt', 'yuv420p', join(ROOT, 'public/capture', `${out}.mp4`)]);
   const data = {name: out, w: size.w, h: size.h, css: viewport, dpr, fps, duration: end, failed, steps: stepLog, events};
   mkdirSync(join(ROOT, 'src/captures'), {recursive: true});
   writeFileSync(join(ROOT, 'src/captures', `${out}.json`), JSON.stringify(data, null, 1));
