@@ -5,10 +5,12 @@
 //            and if that is null (or the file is missing) the video has no music.
 //   :silent  no voice; each line's "caption" is shown as a title instead
 //   STRICT_MOTION=1 makes the freeze check (below) exit with an error instead of a warning
+//   LOUDNORM=<LUFS> normalises the finished file's sound to that loudness, video copied (YouTube: -14; renders come
+//            out quieter, about -26 dB mean). Off by default.
 //   CONCURRENCY=<n> and OTV_CACHE=<bytes> are passed to Remotion (CONCURRENCY=1 OTV_CACHE=400000000 when memory is short)
 //   :vertical renders the 1080x1920 phone cut (products with "vertical": true in src/products.json)
 // The product (composition id prefix and file name) comes from the timeline's "script" via src/products.json.
-import {existsSync, readFileSync} from 'node:fs';
+import {existsSync, readFileSync, renameSync} from 'node:fs';
 import {execFileSync, spawnSync} from 'node:child_process';
 import {basename, dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -44,6 +46,18 @@ const frozenRanges = (file) => {
   }
   return out.map(([s, e]) => [s, Math.min(e, dur - FREEZE_IGNORE_END)]).filter(([s, e]) => e - s > FREEZE_MIN);
 };
+
+// Normalise the sound of a finished render in place (the picture is copied, not re-encoded). A cut without sound is left alone.
+function loudnorm(file, lufs) {
+  if (!(lufs <= -5 && lufs >= -40)) throw new Error(`LOUDNORM must be a loudness in LUFS such as -14, not "${process.env.LOUDNORM}"`);
+  const hasAudio = execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'a', '-show_entries', 'stream=index', '-of', 'csv=p=0', file]).toString().trim();
+  if (!hasAudio) return console.log(`${basename(file)}: no sound, loudness left alone`);
+  const tmp = file.replace(/\.mp4$/, '.loudnorm.mp4');
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', file, '-map', '0', '-c:v', 'copy', '-af', `loudnorm=I=${lufs}:TP=-1.5:LRA=11`,
+    '-ar', '48000', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', tmp]);
+  renameSync(tmp, file);
+  console.log(`${basename(file)}: sound normalised to ${lufs} LUFS`);
+}
 
 const specs = process.argv.slice(2);
 if (!specs.length) throw new Error('usage: node scripts/render.mjs <tag>:<theme>:<music>[:silent][:vertical] ...');
@@ -91,4 +105,5 @@ for (const spec of specs) {
     console.warn(`WARNING: ${msg}`);
   } else console.log(`${name}.mp4: no frozen stretch over ${FREEZE_MIN} s`);
   execFileSync('node', ['scripts/sheet.mjs', `out/${name}.mp4`, tag, `out/sheet-${name}.jpg`], {stdio: 'inherit', cwd: ROOT});
+  if (process.env.LOUDNORM) loudnorm(join(ROOT, 'out', `${name}.mp4`), Number(process.env.LOUDNORM));
 }

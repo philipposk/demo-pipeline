@@ -31,7 +31,7 @@ Options: `--viewport=1600x900` (CSS size of the captured browser; captured at 2�
 `--music=<file>` (ducked under the voice), `--subs=off` (no captions), `--watermark=off`, `--concurrency=<n>` (Remotion).
 A scene may set `cue: 'word'` so its first click lands on that spoken word; without it, the click lands on the first
 narration word that matches the clicked element's label (e.g. "Active" for an Active link). Project configs can set
-`studio: { viewport, dpr, zoom, colors, accent, music, musicGain, captions, watermark }`.
+`studio: { viewport, dpr, zoom, colors, accent, music, musicGain, captions, watermark, loudnorm, serveAs }`. `loudnorm` (or `--loudnorm=-14`) normalises the sound of the finished video to that loudness in LUFS (YouTube: -14); renders come out quiet otherwise. `serveAs: {origin, app}` loads `url` (on the real `origin`) while a local server answers every request, so addresses on screen read like the real site. `CHROME_PATH` points at Playwright's headless shell when its own browser is missing (not full Chrome: its screencast covers only its window).
 
 Word timings come free with `--tts=edge`; other voices fall back to estimated timings (captions still follow the voice,
 cue matching is a little less exact). Render time is about 6× the video length on an M2 laptop (35 s video ≈ 3.5 min),

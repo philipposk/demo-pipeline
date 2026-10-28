@@ -56,10 +56,12 @@ Without API keys you can still render the committed example voice; you only need
 ## 2. Layout
 
 ```
-.env                    API keys (gitignored): OPENAI_API_KEY, DEEPGRAM_API_KEY, GEMINI_API_KEY. Never print or commit.
+.env                    API keys (gitignored): OPENAI_API_KEY, DEEPGRAM_API_KEY, GEMINI_API_KEY, ELEVENLABS_API_KEY. Never print or commit.
 remotion.config.ts      Browser lookup, jpeg frames q95, concurrency 4, h264 crf 16
 scripts/
   voice.mjs             TTS per line -> clean-up -> word timings -> src/timelines/<tag>.json + out/<tag>.vtt
+  clips.mjs             Voices of people inside the video (a call, a team), with word times (section 5)
+  scan.mjs              When a box's colour changes in a recording (crops, sync)
   render.mjs            Render variants + a QA contact sheet:  node scripts/render.mjs <tag>:<theme>:<music>[:silent][:vertical]
   stills.mjs            Quick QA stills without a full render (SILENT=1, VERTICAL=1, COLS=n)
   vspecs.mjs            Three frames per scene for stills.mjs
@@ -78,6 +80,7 @@ src/
   audio.tsx             DemoAudio: voice lines, whooshes, ducked music
   caption.tsx           Caption: the silent cut's word-by-word pill
   footage.tsx           Plays real-app captures inside a scene (optional, section 4.7)
+  screen.tsx            Edits one long screen recording of a real run: makeEdit, Pane, SpeedBadge (section 4.8)
   acme/                 Example product (small): Demo.tsx, scenes.tsx, kit.tsx, vertical.ts
   catchy/               Example product (full landing video): Demo.tsx, scenes1-3.tsx, kit.tsx (logo, speaker colours, theme call)
   scripts/<name>.json   Narration scripts, one per cut
@@ -86,7 +89,8 @@ public/
   sfx/                  click.wav, whoosh.wav (generated, section 7)
   music/                Your tracks (gitignored; section 7)
   voice/<tag>/          Processed narration per timeline; voice/_raw/ is the TTS cache (gitignored)
-capture/record.mjs      Optional real-app screen capture kit (needs `npm i -D playwright`)
+capture/record.mjs      Optional real-app screen capture kit (needs `npm i -D playwright`); serveAs() for the real address
+capture/screen-take/    rec.sh, play.sh, mark.sh: recording a real run on macOS (section 4.8)
 out/                    Renders, sheets, VTTs, stills (gitignored)
 ```
 
@@ -234,6 +238,56 @@ scripted events, served by its dev server; the capture drives those pages, and n
 6. **Sync with recorded sound** (a voice clip, a call): the page shows reactions 0.7-1.1 s after the sound, per take.
    Measure the offset on stills and keep it per capture name.
 7. **QA:** stills of every scene and every sync frame (spoken word vs. the word on screen), then render one variant at a time.
+8. **The real address on screen:** `serveAs(ctx, {origin: 'https://app.example.com', app: 'http://localhost:3000'})` in
+   `init(ctx)` loads the harness under the real address while the local server answers every request, so share links and
+   address bars read like the real site and nothing reaches it. The dev server's websocket is proxied too (Next.js does not
+   hydrate without it; needs Node 22+). Record `https://app.example.com/<harness page>`.
+9. **16:9 and vertical from two takes:** text is readable on a phone only with a tall take. Record the same steps twice
+   (e.g. 1440x900 for 16:9 and 980x1150 for 9:16), log the boxes the camera needs as marks
+   (`h.log({type: 'mark', name: 'panel', box})`), and let the Demo pick the take by `format` and read the boxes from it,
+   so one set of scenes serves both.
+10. **People talking in the video:** make their voices with `scripts/clips.mjs` (section 5). The harness can type each
+   line word by word at the clip's word end times; measure the page's lag behind the sound on a tile of frames per take
+   and offset the footage by it.
+11. **The user's own work beside the app** (their homepage, a slide) is drawn in Remotion, not recorded: it is their
+   material, not the app's, and it can animate when the app's result lands.
+
+### 4.8 Real run (screen recording, macOS)
+
+Only when the brief needs proof that it really happens (an agent fixing and deploying something live). Everything else is
+a harness (4.7): faster, repeatable, no real accounts. A real run needs:
+
+- **A separate demo site** with its own repo and deploy (a tiny static site with one bug and a test), never a real
+  product. Its `CLAUDE.md` holds the deploy and verify steps; its `.claude/settings.json` allows only the tools needed,
+  so no permission prompt appears on camera; `.git/info/exclude` keeps media out (personal files can land in the folder
+  mid-take). A page that reloads itself when its code changes shows the deploy landing.
+- **The person signs in themself** and flips the system settings (Do Not Disturb on, Stage Manager off). Everything else
+  is done for them; when they must act, give exact clicks (Chrome's zoom via its menu, not a shortcut that opens Siri).
+- **Pre-recorded voices** for the people in the story (`scripts/clips.mjs`), played through the speakers with
+  `capture/screen-take/play.sh`, and **a director**: play the next clip only once the agent has done its part (poll the
+  page's DOM once with a long-waiting script, `curl` the live site until the deploy lands), log milestones with
+  `mark.sh`.
+- **The recording:** `capture/screen-take/rec.sh <out.mp4> [screen index]` (avfoundation, 30 fps, Retina) until
+  `pkill -INT -f avfoundation`. `rec.sh`, `play.sh` and `mark.sh` log epoch times to `take.log`, so the edit places the
+  clean clip audio exactly where it was heard. Arrange the windows first with AppleScript (`set bounds of w to {...}`) and
+  check with `screencapture -x`. Crop the menu bar off (`crop=2560:1588:0:76` on a 1280x832 Retina screen) and re-encode
+  with `-g 15 -bf 0`.
+- **A coding agent on camera:** start it with a clean environment (`env -i HOME=... PATH=... <cli>`), so it does not
+  inherit another session's; use a current CLI (an old one on PATH lists old models); turn off plugins and status lines
+  that would show, per folder in `.claude/settings.local.json`. Type its command into the running terminal once its
+  tools are connected (`osascript -e 'tell application "Terminal" to do script "..." in selected tab of front window'`);
+  a slash command given at start-up runs before its tools connect.
+- **The edit:** `src/screen.tsx`. `makeEdit(PIECES)` maps output time to recording time (cuts, and speed-ups that
+  `SpeedBadge` marks "▶▶ ×N"); `Pane` frames one window of the recording in a slot with camera shots and rings; place
+  the clean clip audio with `<Html5Audio trimBefore trimAfter>` at `edit.outOf(piece, logged second)`; narration by output
+  second.
+- **Show what really happened.** If the agent waited for a typed "go" instead of acting on a spoken approval, the video
+  says "It waits for your go" and cuts the spoken one. Never narrate something the take did not show. Mark it on the end
+  card: "A real run, sped up where marked".
+- Chrome shows "… started debugging this browser" in every window while an agent drives it, pushing the page down
+  (56 px) and coming and going: find when with `node scripts/scan.mjs <rec.mp4> <x,y,w,h>` and shift the pane's crop
+  (`Pane` `dy`), or keep browser automation out of the take. Hide private things: the tab strip, sidebars of real data,
+  other windows.
 
 ## 5. Voice: `scripts/voice.mjs`
 
@@ -280,7 +334,17 @@ part of the cache key.
 | `openai` (default) | `gpt-4o-mini-tts`, style set through `instructions`, so it never reads the style aloud. Voices: marin, cedar, coral and more. Disclose "AI voice" wherever the video is published. |
 | `gemini` | Style must go in `systemInstruction`, otherwise it reads the style text aloud. Gemini 2.5 TTS models (`GEMINI_TTS_MODEL=gemini-2.5-flash-preview-tts`) take no system instruction, so `voice.mjs` puts the style in front of the text: write it in the script's language. The free tier stops after 10 requests a day per model, so it needs billing on its Google project; a 429 that names `FreeTier` means the key's project has no billing yet. |
 | `deepgram` | Aura-2 voices with no style control. Fine, but flatter. |
-| Avoid | ElevenLabs free tier (no commercial use) and edge-tts (unclear commercial licence). |
+| `eleven` | ElevenLabs (`ELEVENLABS_API_KEY`, `VOICE=<voice id>`, `ELEVEN_SPEED=0.7-1.2`, model `eleven_multilingual_v2`). No style prompt; mp3 at 128 kbps (higher needs a paid tier). The free tier is not for commercial use; Starter is. Stock voices that worked: Sarah `EXAVITQu4vr4xnSDxMaL` (warm, confident), Brian `nPczCjzI2devNBz1zQrb` (deep, dry); Chris and Liam read very fast. |
+| Avoid | edge-tts (unclear commercial licence). |
+
+**Pacing by ear.** People hear "slow and weird" quickly. Calm or confident style prompts made OpenAI lines drag; a comma
+in mid-sentence adds a pause ("120 minutes, every month" reads better without it); odd phrases stand out. Re-voice with a
+natural-pace style or try another provider, and send two short samples for the person to pick from.
+
+**Voices of people in the video** (a client on a call, a team): `node scripts/clips.mjs <spec.json>`. Each clip is one or
+more lines, each with its own OpenAI voice and style, joined with gaps; output `<out>/<clip>.wav` and `<out>/clips.json`
+with word times per line, for typing in harness pages and word-lit captions. Pick clearly different voices: a recogniser
+merges two similar ones into one speaker.
 
 **Word timings:** Deepgram nova-3 when `DEEPGRAM_API_KEY` exists, because its timings are tighter than Whisper's (Whisper sometimes puts two words 0.02 s apart). Without it the OpenAI key is used for Whisper. Each line gets 0.3 s of silence in front before it is sent, so the recogniser does not miss the first word.
 
@@ -298,7 +362,13 @@ node scripts/render.mjs <tag>:<theme>:<music>[:silent][:vertical] ...
 4. Check that late animations are not cut off, and look at light and dark separately.
 5. Listen for glitches at pauses, a reveal that doesn't match the word, and music that is too loud. Music is ducked to 0.2 under the voice and rises to 0.42 in the gaps.
 
-**Audio check:** `ffmpeg -i X.mp4 -af volumedetect -f null -`.
+**Audio check:** `ffmpeg -i X.mp4 -af volumedetect -f null -`. Renders come out quiet (about -26 dB mean):
+`LOUDNORM=-14 node scripts/render.mjs ...` normalises the finished file to -14 LUFS for YouTube (picture copied). Music
+files are normalised to -16 LUFS when added (section 7).
+
+**Finding moments:** `node scripts/scan.mjs <video.mp4> <x,y,w,h>` prints when a box's colour jumps (a bar appearing, a
+price changing), for crops and sync. A tile of frames with timestamps (`ffmpeg ... -vf "fps=10,tile=6x4"`) shows the lag
+between a sound and the page's reaction.
 
 ## 7. Music and sound effects
 
@@ -345,9 +415,21 @@ cp out/<tag>.vtt out/site/demo.vtt
   - Remotion shows only the keyframes of video above about 8.9 Mpx; `record()` scales down (4.7).
   - Caption word matching (`norm` in `src/vertical.tsx` and `src/lib.tsx`) keeps letters in any alphabet (`\p{L}`);
     with `[a-z]` only, every Greek word matched the empty string.
+- **Fonts:** Inter turns an "x" between digits into "×" (contextual alternates). Set `fontFeatureSettings: '"calt" 0'` on
+  brand names and addresses that contain one.
+- **Register before voicing:** a timeline whose script no product lists is skipped (with a warning) and cannot be
+  rendered; add the product to `products.json` and `products.ts` first.
+- **One render at a time on the machine,** across all projects and sessions. Check with
+  `pgrep -f "remotion rende[r] src/"` (the bracket stops it matching itself). Never `pgrep -fl`: it prints environments,
+  API keys included. Never delete `$TMPDIR/remotion-webpack-bundle-*` while anything renders.
+- **Browser for captures:** Playwright's downloaded browsers can vanish with disk cleanup. Point `CHROME_PATH` at
+  Playwright's headless shell, not full Chrome: full Chrome's screencast covers only its window (about 813 of 900 px)
+  and the frames come out stretched.
 - **Memory and disk on long captures:** "Could not extract frame from compositor … disk space is low" means the machine
   ran out of memory or disk, not a code bug. Render one at a time with `CONCURRENCY=1 OTV_CACHE=400000000`, check free
-  disk first, and delete `$TMPDIR/remotion-webpack-bundle-*` (about 250 MB each) after every render.
+  disk first, and delete `$TMPDIR/remotion-webpack-bundle-*` (about 250 MB each) after every render, once nothing else
+  renders. A 4 Mpx recording in three panes failed with "Failed to fetch" at concurrency 2 and worked at 1 with a smaller
+  cache.
 - **Shell and tooling:** zsh does not split `$var` in `for` loops (use node runners or arrays); BSD `sed` has no `\b`; Node ESM resolves packages relative to the script file's folder.
 - **Remotion:**
   - The audio component is `Html5Audio`.

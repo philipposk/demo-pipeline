@@ -18,9 +18,17 @@ export const RemotionRoot: React.FC = () => (
     {Object.keys(TIMELINES).map((tag) => {
       const tl = timelineOf(tag);
       const product = tl.script ? productOf(tl.script) : undefined;
-      if (!product) throw new Error(`timeline "${tag}" uses script "${tl.script}", which no product in src/products.json lists`);
+      // A timeline voiced before its product was registered must not break every other render: skip it, loudly.
+      // (scripts/render.mjs still refuses to render that tag, with the same message.)
+      if (!product) {
+        console.warn(`timeline "${tag}" uses script "${tl.script}", which no product in src/products.json lists: skipped`);
+        return null;
+      }
       const Demo = DEMOS[product];
-      if (!Demo) throw new Error(`product "${product}" is in src/products.json but has no Demo in src/products.ts`);
+      if (!Demo) {
+        console.warn(`product "${product}" is in src/products.json but has no Demo in src/products.ts: skipped`);
+        return null;
+      }
       const defaults: DemoProps = {tag, theme: 'light', music: META[product].music};
       // Products that support it also get a vertical (9:16) cut for phones: "<Product>-<tag>-vertical".
       return (

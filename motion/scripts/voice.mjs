@@ -3,7 +3,8 @@
 //
 // Usage: node scripts/voice.mjs --script=<name> [--tag=<name>] [--retime]   (tag defaults to the script name)
 //        node scripts/voice.mjs --script=<name> --takes=4 --lines=reveal,end   # audition: 4 fresh takes per line, no timeline
-//   VOICE_PROVIDER=openai|gemini|deepgram (default openai)   VOICE=<name> (openai default: marin)
+//   VOICE_PROVIDER=openai|gemini|deepgram|eleven (default openai)   VOICE=<name, or an ElevenLabs voice id> (openai default: marin)
+//   ELEVEN_SPEED=0.7-1.2 (ElevenLabs only; part of the cache key)   ELEVEN_MODEL (default eleven_multilingual_v2)
 //   PACE=normal|fast (fast: tighter holds, quicker speech)
 //   VOICE_STYLE=<how to speak> replaces the default style prompt (write it in the script's language)
 //   STT_LANG=<code> is the spoken language for word timings (e.g. el); WPM=<n> the target speed (Greek: 100, so
@@ -40,9 +41,11 @@ const keyOf = (name) => process.env[name] || envs.map((e) => e[name]).find(Boole
 const arg = (name, dflt) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? dflt;
 const retime = process.argv.includes('--retime');
 const PROVIDER = process.env.VOICE_PROVIDER || 'openai';
-const VOICE = process.env.VOICE || {gemini: 'Zephyr', deepgram: 'aura-2-thalia-en', openai: 'marin'}[PROVIDER];
+const VOICE = process.env.VOICE || {gemini: 'Zephyr', deepgram: 'aura-2-thalia-en', openai: 'marin', eleven: 'EXAVITQu4vr4xnSDxMaL'}[PROVIDER];
 const PACE = process.env.PACE || 'normal';
-const TTS_KEY = keyOf({gemini: 'GEMINI_API_KEY', deepgram: 'DEEPGRAM_API_KEY', openai: 'OPENAI_API_KEY'}[PROVIDER]);
+const TTS_KEY = keyOf({gemini: 'GEMINI_API_KEY', deepgram: 'DEEPGRAM_API_KEY', openai: 'OPENAI_API_KEY', eleven: 'ELEVENLABS_API_KEY'}[PROVIDER]);
+const ELEVEN_SPEED = process.env.ELEVEN_SPEED ? Number(process.env.ELEVEN_SPEED) : null;
+if (ELEVEN_SPEED !== null && !(ELEVEN_SPEED >= 0.7 && ELEVEN_SPEED <= 1.2)) throw new Error('ELEVEN_SPEED must be between 0.7 and 1.2');
 const DG_KEY = keyOf('DEEPGRAM_API_KEY');
 if (!TTS_KEY) throw new Error(`API key for ${PROVIDER} missing`);
 
@@ -68,7 +71,8 @@ const SCRIPT = arg('script');
 if (!SCRIPT) throw new Error('usage: node scripts/voice.mjs --script=<name> [--tag=<name>] [--retime]');
 const TAG = arg('tag', SCRIPT);
 const script = JSON.parse(readFileSync(join(ROOT, 'src/scripts', `${SCRIPT}.json`), 'utf8'));
-const rawDir = join(ROOT, 'public/voice/_raw', `${PROVIDER}-${VOICE}${STYLE_IN_PROMPT ? '-25' : ''}`);
+const rawDir = join(ROOT, 'public/voice/_raw',
+  `${PROVIDER}-${VOICE}${STYLE_IN_PROMPT ? '-25' : ''}${PROVIDER === 'eleven' && ELEVEN_SPEED !== null ? `-s${ELEVEN_SPEED}` : ''}`);
 const outDir = join(ROOT, 'public/voice', TAG);
 const tlDir = join(ROOT, 'src/timelines');
 for (const d of [rawDir, outDir, tlDir, join(ROOT, 'out')]) mkdirSync(d, {recursive: true});
@@ -108,6 +112,20 @@ async function tts(text, file, style = STYLE) {
       return rmSync(pcm);
     }
     throw new Error('TTS kept failing (rate limit or server error)');
+  }
+  // ElevenLabs: VOICE is a voice id; there is no style prompt. mp3 at 128 kbps (higher needs a paid tier), then wav.
+  if (PROVIDER === 'eleven') {
+    const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE}?output_format=mp3_44100_128`, {
+      method: 'POST',
+      headers: {'xi-api-key': TTS_KEY, 'Content-Type': 'application/json'},
+      body: JSON.stringify({text, model_id: process.env.ELEVEN_MODEL || 'eleven_multilingual_v2',
+        voice_settings: {stability: 0.5, similarity_boost: 0.75, use_speaker_boost: false, speed: ELEVEN_SPEED ?? 1}}),
+    });
+    if (!r.ok) throw new Error(`TTS ${r.status}: ${(await r.text()).slice(0, 300)}`);
+    const mp3 = `${file}.mp3`;
+    writeFileSync(mp3, Buffer.from(await r.arrayBuffer()));
+    ff(['-i', mp3, '-ar', '48000', '-ac', '1', file]);
+    return rmSync(mp3);
   }
   if (PROVIDER === 'deepgram') {
     const r = await fetch(`https://api.deepgram.com/v1/speak?model=${VOICE}&encoding=linear16&sample_rate=48000&container=wav`, {
