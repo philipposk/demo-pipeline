@@ -360,7 +360,7 @@ node scripts/render.mjs <tag>:<theme>:<music>[:silent][:vertical] ...
 2. Read `out/sheet-<name>.jpg` (one frame near the end of each scene).
 3. Check that nothing is cropped wrongly and that no text or claim is inaccurate.
 4. Check that late animations are not cut off, and look at light and dark separately.
-5. Listen for glitches at pauses, a reveal that doesn't match the word, and music that is too loud. Music is ducked to 0.2 under the voice and rises to 0.42 in the gaps.
+5. Listen for glitches at pauses, a reveal that doesn't match the word, and music that is too loud. Music is ducked to 0.2 under the voice and rises to 0.42 in the gaps; voices less than 0.7 s apart count as one, so the music stays down between them instead of swelling for a split second (a composition with its own clips should merge them the same way).
 
 **Audio check:** `ffmpeg -i X.mp4 -af volumedetect -f null -`. Renders come out quiet (about -26 dB mean):
 `LOUDNORM=-14 node scripts/render.mjs ...` normalises the finished file to -14 LUFS for YouTube (picture copied).
