@@ -360,10 +360,13 @@ node scripts/render.mjs <tag>:<theme>:<music>[:silent][:vertical] ...
 2. Read `out/sheet-<name>.jpg` (one frame near the end of each scene).
 3. Check that nothing is cropped wrongly and that no text or claim is inaccurate.
 4. Check that late animations are not cut off, and look at light and dark separately.
-5. Listen for glitches at pauses, a reveal that doesn't match the word, and music that is too loud. Music is ducked to 0.2 under the voice and rises to 0.42 in the gaps.
+5. Listen for glitches at pauses, a reveal that doesn't match the word, and music that is too loud. Music is ducked to 0.2 under the voice and rises to 0.42 in the gaps; voices less than 0.7 s apart count as one, so the music stays down between them instead of swelling for a split second (a composition with its own clips should merge them the same way).
 
 **Audio check:** `ffmpeg -i X.mp4 -af volumedetect -f null -`. Renders come out quiet (about -26 dB mean):
-`LOUDNORM=-14 node scripts/render.mjs ...` normalises the finished file to -14 LUFS for YouTube (picture copied). Music
+`LOUDNORM=-14 node scripts/render.mjs ...` normalises the finished file to -14 LUFS for YouTube (picture copied).
+`SCALE=1.3333` renders a 1440p master (2560x1440, or 1440x2560 for the phone cut): YouTube serves 1440p uploads with a
+better codec, so UI text stays sharp. Right after upload YouTube plays only 240p/360p until HD processing finishes
+(minutes to an hour); the uploader cannot set a default quality. Music
 files are normalised to -16 LUFS when added (section 7).
 
 **Finding moments:** `node scripts/scan.mjs <video.mp4> <x,y,w,h>` prints when a box's colour jumps (a bar appearing, a
@@ -376,6 +379,9 @@ between a sound and the page's reaction.
 
 To add a track:
 1. Pick one from a royalty-free library whose licence allows your use, for example Mixkit (https://mixkit.co/free-stock-music/, Mixkit Stock Music Free License: commercial use, no credit; read the licence yourself, and do not redistribute the files).
+   On a Mixkit tag page (for example `mixkit.co/free-stock-music/tag/electronic/`) each track's mp3
+   (`assets.mixkit.co/music/<id>/<id>.mp3`) follows its title in the page's HTML. Check the file's duration against the
+   track listing before using it: pages also hold featured tracks. Ask the person before downloading anything.
 2. Normalise it and save it into `public/music/`:
    ```bash
    ffmpeg -i in.mp3 -af "loudnorm=I=-16:TP=-1.5:LRA=11" -ar 48000 -b:a 192k public/music/<name>.mp3
@@ -425,6 +431,9 @@ cp out/<tag>.vtt out/site/demo.vtt
 - **Browser for captures:** Playwright's downloaded browsers can vanish with disk cleanup. Point `CHROME_PATH` at
   Playwright's headless shell, not full Chrome: full Chrome's screencast covers only its window (about 813 of 900 px)
   and the frames come out stretched.
+- **"TypeError: Failed to fetch"** during a render of a big recording (a 4 Mpx screen recording in three panes, or 1080p
+  takes) means memory ran out at concurrency 2. `render.mjs` now tries such a render once more by itself with
+  `CONCURRENCY=1 OTV_CACHE=300000000`.
 - **Memory and disk on long captures:** "Could not extract frame from compositor … disk space is low" means the machine
   ran out of memory or disk, not a code bug. Render one at a time with `CONCURRENCY=1 OTV_CACHE=400000000`, check free
   disk first, and delete `$TMPDIR/remotion-webpack-bundle-*` (about 250 MB each) after every render, once nothing else
